@@ -1,0 +1,252 @@
+---
+title: "CH 2 MSWR"
+author: "Matthew Swanson"
+date: "20190903"
+output:
+    bookdown::html_document2:
+    highlight: textmate
+    theme: yeti
+---
+
+## Basic Plots
+
+Covered last week
+
+## Numerical Summaries
+
+### Center
+
+#### Mean
+
+If $x_1,x_2,...,x_n$ are $n$ data values, then the mean is:
+
+$\bar{x} = \dfrac{1}{n}\sum_{i=1}^n x_i$
+
+Find the mean of 2, 15, 3, 8, 12, 5.
+
+```{r}
+data = c(2,15,3,8,12,5)
+mean(data)
+```
+
+#### Median
+
+Median is the middle value of a sorted data set. Usually works well with outliers and when the distribution is skewed.
+
+Find the median of 2, 15, 3, 8, 12, 5.
+
+```{r}
+median(data)
+```
+
+#### Trimmed Mean (25% Trimmed Mean)
+
+Here for example you sort the data, omit 25% of the observations on each end, and then take the mean of the remaining middle 50% of the observations. Usually works well with outliers.
+
+Find the 25% Trimmed Mean of 2, 15, 3, 8, 12, 5.
+
+```{r}
+mean(data, trim = 0.25)
+```
+
+### Spread
+
+Following are the common measures of the spread:
+
+#### Range
+
+Range is the difference between the largest and the smallest values. Range is sensitive to outliers.
+
+#### IQR
+
+Range is the difference between the third and the first quartiles (75th and the 25th percentiles). IQR is NOT sensitive to outliers.
+
+#### Standard deviation
+
+If $x_1, x_2,...,x_n$ are $n$ data values then the Standard deviation is:
+
+$s = \sqrt{\dfrac{1}{n-1}\sum_{i=1}^n (x_i - \bar{x})^2}$
+
+Example: Find the Range, IQR and the Standard deviation of 2, 15, 3, 8, 12, 5.
+
+```{r}
+range(data)
+IQR(data)
+sd(data)
+```
+
+### Shape
+
+#### Five number summary
+
+In this class we use the `five number summary` to describe the shape of a data set.
+
+`five number summary`: The minimum, first quartile, median, third quartile, and the maximum.
+
+Example: Conside the 15 numbers 9,10,11,11,12,14,16,17,19,21,25,31,32,41,61. Find the five number summary.
+
+```{r}
+#fivenum(data)
+data = c(9,10,11,11,12,14,16,17,19,21,25,31,32,41,61)
+summary(data)
+```
+
+Five number summary is:
+
+    1. 9
+    2. 11.5
+    3. 17
+    4. 28
+    5. 61
+
+#### Boxplots
+
+A boxplot is a type of graph that can be used to visualize the five-number summary.
+
+Create a boxplot for the following 21 data values.
+
+5, 6, 6, 8, 9, 11, 11, 14, 17, 17, 19, 20, 21, 21, 22, 23, 24, 32, 40, 43, 49.
+
+```{r}
+#boxplot(data)
+library(ggplot2)
+data = c(5,6,6,8,9,11,11,14,17,17,19,20,21,21,22,23,24,32,40,43,49)
+data = data.frame(data)
+ggplot(data, mapping = aes(y = data)) +
+  geom_boxplot()
+```
+
+![Boxplot Example](boxplot.png)
+
+#### Normal Distribution
+
+The normal distribution is the most important and most widely used distribution in statistics. It is sometimes called the “bell curve” because the normal distribution is bell shaped and symmetric. We would “like” data to be normally distributed.
+
+Here is an example: Check whether the data below are normal distributed.
+
+1. Create a histogram and check if it is “Normal” enough!
+
+```{r}
+data <- c(11.62, 15.92, 12.40, 14.40, 10.28, 13.15, 11.22,  7.35, 16.45,  5.37, 10.25, 12.41, 11.43,  8.00, 11.90, 17.86,  7.59, 11.88, 14.54, 14.44, 10.29,  5.47,  8.20, 10.56, 11.18)
+df <- data.frame(data)
+
+ggplot(data = df, mapping = aes(x = data)) +
+  geom_histogram(bins = 10)
+```
+
+2. Check using a Normal quantile plot (QQ plot) - Preferred way!
+
+If the plotted points follow the identity line, then your data is Normal.
+
+```{r}
+data <- c(11.62, 15.92, 12.40, 14.40, 10.28, 13.15, 11.22,  7.35, 16.45,  5.37, 10.25, 12.41, 11.43,  8.00, 11.90, 17.86,  7.59, 11.88, 14.54, 14.44, 10.29,  5.47,  8.20, 10.56, 11.18)
+
+df <- data.frame(data)
+
+ggplot(data = df, aes(sample = data)) +
+  geom_qq() + geom_qq_line()
+```
+
+***
+
+### Exercise
+
+1. Import the `flight delays` case study in Section 1.1.
+
+```{r}
+library(resampledata)   # dataset for MSWR book is in this library
+library(ggplot2)
+library(dplyr)
+data(FlightDelays)
+```
+
+2. Create a table and a bar chart of the departure times (`DepartTime`)
+
+```{r}
+str(FlightDelays)   #peep the data
+table(FlightDelays$DepartTime)
+ggplot(data = FlightDelays, aes(x = DepartTime)) +
+  geom_bar(fill = "green4")
+```
+
+3. Create a contingency table of the variables `Day` and `Delayed30`. For each day, what is the proportion of flights delayed at least 30 min.
+
+```{r}
+table(FlightDelays$Day, FlightDelays$Delayed30)
+```
+
+Here we use Ch 5: Data Wrangling via `dplyr`, of MD.
+
+The `%>%` operator allows us to go from one step in `dplyr` to the next easily so we can, for example:
+
+* `filter` our data frame to only focus on a few rows then
+* `group_by` another variable to create groups then
+* `summarize` this grouped data to calculate the mean (for example) for each level of the group.
+
+```{r}
+library(knitr)
+
+day_delayed30 <- FlightDelays %>%
+  group_by(Day) %>%
+  # summarize(prop = sum(Delayed30 == "Yes")/sum(Delayed30 == "Yes"|Delayed30 == "No"))
+  summarize(prop = mean(Delayed30 == "Yes"))
+
+kable(day_delayed30)
+```
+
+4. Create side by side boxplots of the lenghts of the flights, grouped by whether or not the flight was delayed at least 30 min.
+
+```{r}
+ggplot(data = FlightDelays, aes(x = Delayed30, y = FlightLength)) + geom_boxplot()
+#x: categorical var
+#y: numerical var
+#turn x-int to x-factor: x = factor([x-int])
+```
+
+5. Do you think that there is a relationship between the length of a flight and whether or not the depature is delayed by at least 30 min?
+
+    *answer*
+
+***
+
+### Exercise
+
+Load General Social Survery data into R (from section 1.7)
+
+```{r}
+library(resampledata)
+data(GSS2002)
+```
+
+Create a table and a bar chart of the responses to the question about the death penalty.
+
+```{r}
+table(GSS2002$DeathPenalty)
+ggplot(data = GSS2002, aes(x = DeathPenalty)) +
+  geom_bar(fill = "red4")
+```
+
+Use the `table` command and the `summary` command in R on the gun ownership variable. What additional infomation does the `summary` command give that the `table` command does not?
+
+```{r}
+table(GSS2002$OwnGun)
+summary(GSS2002$OwnGun)
+```
+
+Create a contingency table displaying the realtionship between opinions about the death penalty to that about gun ownership.
+
+```{r}
+table(GSS2002$DeathPenalty, GSS2002$OwnGun)
+```
+
+What proportion of gun owners favor the death penalty? Does it appear to be different from the proportion among those who do not own guns?
+
+```{r}
+gunprop <- GSS2002 %>%
+  group_by(OwnGun) %>%
+  summarize(prop = mean(DeathPenalty == "Favor", na.rm = TRUE))
+
+kable(gunprop)
+```
+
+*Around 80% of gun owners favor the death penalty. This is 20% higher than those who do not own guns.*

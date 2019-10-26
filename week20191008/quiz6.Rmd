@@ -1,0 +1,25 @@
+---
+title: "Quiz 6"
+author: "Matthew Swanson"
+date: "10/10/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. 
+```{r}
+library(resampledata)
+data("Beerwings")
+```
+
+2. 
+
+3.
+```{r}
+library(skimr)
+Beerwings %>%  skim()
+```
+

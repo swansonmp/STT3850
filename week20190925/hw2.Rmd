@@ -1,0 +1,123 @@
+---
+title: "HW 2"
+author: "Matthew Swanson"
+date: "20191003"
+output: 
+    bookdown::html_document2:
+    highlight: textmate
+    theme: yeti
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center", comment = NA, options(scipen=999))
+```
+
+```{r}
+library(resampledata)
+data(FlightDelays)
+library(dplyr)
+library(knitr)
+```
+
+*Exercise 3.8*
+
+In the Flight Delays Case Study in Section 1.1:
+
+a. Find the 25% trimmed mean of the delay times for United Airlines and American Airlines.
+b. Conduct a two-sided test to see if the difference in trimmed means is statistically significant.
+
+```{r}
+#a.
+ans <- FlightDelays %>% 
+  group_by(Carrier) %>% 
+  summarize(Tr.mean = mean(Delay, trim = 0.25), N = n())
+ans
+```
+
+$H_0:\mu_U - \mu_A = 0$
+
+$H_A: \mu_U - \mu_A \neq 0$
+
+```{r}
+#b.
+md <- ans[2, 2] - ans[1, 2]
+observed <- md$Tr.mean
+
+set.seed(1)
+sims <- 10^4 - 1 # Number of simulations (iterations)
+ans <- numeric(sims)
+for(i in 1:sims){
+  index <- sample.int(n = 4029, size =1123, replace = FALSE)
+  ans[i] <- mean(FlightDelays$Delay[index], trim = 0.25) - mean(FlightDelays$Delay[-index], trim = 0.25)
+}
+pvalue <- 2*(sum(ans >= observed) + 1)/(sims + 1)
+pvalue
+```
+
+> pvalue = $0.0002 < 0.05$, so we reject $H_0$
+
+> There is enough evidence to conclude that, on average, the mean delay times between United Airlines and American Airlines are *not* equal
+
+*Exercise 3.9*
+
+In the Flight Delays Case Study in Section 1.1,
+
+a. Compute the proportion of times the flights in May and in June were delayed more than 20 min, and conduct a two-sided test of whether the difference between months is statistically significant.
+
+$H_0:p_J - p_M = 0$
+
+$H_A: p_J - p_M \neq 0$
+
+```{r}
+FlightDelays$Delayed20 = FlightDelays$Delay > 20
+
+ans <- FlightDelays %>%
+  group_by(Month) %>%
+  summarize(prop = mean(Delayed20), N = n())
+ans
+
+md <- ans[2, 2] - ans[1, 2]
+observed <- md$prop
+set.seed(1)
+sims <- 10^4 - 1 # Number of simulations (iterations)
+ans <- numeric(sims)
+for(i in 1:sims){
+  index <- sample.int(n = 4029, size =2030, replace = FALSE)
+  ans[i] <- mean(FlightDelays$Delayed20[index]) - mean(FlightDelays$Delayed20[-index])
+}
+pvalue <- 2*(sum(ans >= observed) + 1)/(sims + 1)
+pvalue
+```
+
+> pvalue = $0.0168 < 0.05$, so we reject $H_0$
+
+> There is enough evidence to conclude that, on average, the proportion of delay times over 30 minutes during May versus during June are *not* equal
+
+b. Compute the variance of the flight delay times in May and June and then conduct a two-sided test of whether the ratio of variances is statistically significantly different from 1.
+
+$H_0:\sigma_J / \sigma_M = 1$
+
+$H_A: \sigma_J / \sigma_M \neq 1$
+
+```{r}
+ans <- FlightDelays %>%
+  group_by(Month) %>%
+  summarize(SD = sd(Delay), N = n())
+ans
+
+md <- ans[2, 2] / ans[1, 2]
+observed <- md$SD
+set.seed(1)
+sims <- 10^4 - 1 # Number of simulations (iterations)
+ans <- numeric(sims)
+for(i in 1:sims){
+  index <- sample.int(n = 4029, size =2030, replace = FALSE)
+  ans[i] <- sd(FlightDelays$Delay[index]) / sd(FlightDelays$Delay[-index])
+}
+pvalue <- 2*(sum(ans >= observed) + 1)/(sims + 1)
+pvalue
+```
+
+> pvalue = $0.0336 < 0.05$, so we reject $H_0$
+
+> There is enough evidence to conclude that, on average, the ratio of variances between flight delay times in May versus June are *not* equal

@@ -1,0 +1,232 @@
+```{r, include = FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.align = "center", comment = NA, options(scipen=999))
+
+library(ggplot2)
+library(dplyr)
+library(moderndive)
+library(skimr)
+library(cowplot)
+library(plotly)
+```
+
+# Data Description
+
+After you graduated, you started to work for one of the best firms in the country. You were hired because you have Data Analysis skills with $R$. During your first week your manager comes to your office and gives you the following data set and ask you to “analyze the hell out of this data” (his words. not mine). Mainly he wants you to build a linear model to predict executive salaries. But you know you can do much more! Analyze the given data and create a report like your job depends on this.
+
+Data stored as a `.txt` file under week 10. Data consists of 11 variables.
+
+
+# Load Data into R
+
+```{r}
+
+df <- read.table("EXECSAL2.txt", header = T)
+
+kable(head(df))
+```
+
+```{r}
+varTable = data.frame(
+c("y1", "x1", "x2", "x3", "x4", "x5",
+  "x6", "x7", "x8", "x9", "x10"),
+c("salary", "experience", "education", "gender", "emps_sump",
+  "assets", "board_mb", "age", "profit", "int_res", "sales"),
+c("Salary of executive", "Experience(in years)", "Education (in years)", 
+  "Gender (1 if male 0 if female)", "Number of employees supervised",
+  "Corporate assets (in millions of USD)", "Board member (1 if yes, 0 if no)", "Age (in years)", 
+  "Company profits (in millions of USD)", "Has international responsibility (1 if yes, 0 if no)",
+  "Company’s total sales (in millions of USD)"))
+names(varTable) <- c("Variable", "Name", "Description")
+kable(varTable)
+```
+
+
+
+# Read Table
+```{r}
+df = read.table("EXECSAL2.txt", header = T)
+```
+
+# Rename Columns
+```{r}
+# rename columns
+names(df) = c("id", "salary", "experience", "education", "gender", "emps_sup", "assets", "board_mb", "age", "profit", "int_res", "sales")
+# remove id column
+df = df %>% select(salary, experience, education, gender, emps_sup, assets, board_mb, age, profit, int_res, sales)
+```
+
+# Conduct EDA
+
+## Looking at Raw Values
+```{r}
+kable(head(df))
+```
+
+* In console
+
+    * library(ISLR)
+    
+    * View(df)
+
+    * ?df
+
+## Computing Summary Statistics
+``` {r}
+#factor df for clearer summary statistics
+df_factor = df
+df_factor[,'gender']<-factor(df_factor[,'gender'])
+df_factor[,'board_mb']<-factor(df_factor[,'board_mb'])
+df_factor[,'int_res']<-factor(df_factor[,'int_res'])
+df_factor %>% skim()
+```
+
+### Description of Summary Statistics
+
+  * The minimum value of `age` = 23, `assets` = 150, `education` = 12, `emps_sup` = 60, `experience` = 1, `profit` = 5, `sales` = 20, and `salary` = 12.06.
+  
+  * The maximum value of `age` = 64, `assets` = 200, `education` = 20, `emps_sup` = 600, `experience` = 26, `profit` = 10, `sales` = 30, `salary` = 10.66.
+  
+  * The mean value of `age` = 42.84, `assets` = 175.1, `education` = 16.02, `emps_sup` = 340.1, `experience` = 13.08, `profit` = 7.7,  `sales` = 24.83, `salary` = 11.46.
+
+  
+  * The standard deviation of `age` = 9.07, `assets` = 15.41, `education` = 2.3, `emps_sup` = 167.18, `experience` = 7.34, `profit` = 1.55, `sales` = 2.74, `salary` = 0.26.
+  
+  * From these histograms we can see that;
+  
+```{r}
+Variable <- c("age", "assets", "education", "emps_sup", "experience", "profit", "sales", "salary")
+Distribution <- c("Normal","Random","Mostly Uniform","Mostly Uniform","Random","Random","Skewed Right","Skewed Left")
+tibble(Variable, Distribution)
+```
+    * This means the number of people with an age between 33.77and 51.91 is larger than the number of people of ages outside this range.
+  
+    * This means the value of assets is random across the population.
+  
+    * This means the number of people with any number of years of education is evenly distributed.
+  
+    * This means the number of employees supervised is evenly distributed.
+  
+    * This means the number of years of experience is random across the population.
+  
+    * This means the value of profit is random across the population.
+    
+    * This means the company's total sales is \$25 million or below.
+      
+    * This means the executive salary is \$11.46 million or above.
+
+
+## Creating Data Visualizations
+``` {r}
+#distribution of explanatory variables
+x1 = ggplot(data = df, mapping = aes(x = age)) + geom_histogram(binwidth = 5, fill = 'purple2', color = 'purple4')
+x2 = ggplot(data = df, mapping = aes(x = assets)) + geom_histogram(binwidth = 10, fill = 'blue2', color = 'blue4')
+x3 = ggplot(data = df, mapping = aes(x = factor(board_mb))) + geom_bar(fill = 'cyan2', color = 'cyan4')
+x4 = ggplot(data = df, mapping = aes(x = education)) + geom_histogram(binwidth = 2, fill = 'aquamarine2', color = 'aquamarine4')
+x5 = ggplot(data = df, mapping = aes(x = emps_sup)) + geom_histogram(binwidth = 100, fill = 'green2', color = 'green4')
+x6 = ggplot(data = df, mapping = aes(x = experience)) + geom_histogram(binwidth = 5, fill = 'yellow2', color = 'yellow4')
+x7 = ggplot(data = df, mapping = aes(x = factor(gender))) + geom_bar(fill = 'orange2', color = 'orange4')
+x8 = ggplot(data = df, mapping = aes(x = factor(int_res))) + geom_bar(fill = 'red2', color = 'red4')
+x9 = ggplot(data = df, mapping = aes(x = profit)) + geom_histogram(binwidth = 1, fill = 'maroon2', color = 'maroon4')
+x10 = ggplot(data = df, mapping = aes(x = sales)) + geom_histogram(binwidth = 2, fill = 'deeppink2', color = 'deeppink4')
+plot_grid(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10)
+
+#explanatory variables and salary
+y1 = ggplot(data = df, mapping = aes(x = age, y = salary)) + geom_point(fill = 'purple2', color = 'purple4')
+y2 = ggplot(data = df, mapping = aes(x = assets, y = salary)) + geom_point(fill = 'blue2', color = 'blue4')
+y3 = ggplot(data = df, mapping = aes(x = factor(board_mb), y = salary)) + geom_boxplot(fill = 'cyan2', color = 'cyan4')
+y4 = ggplot(data = df, mapping = aes(x = education, y = salary)) + geom_point(fill = 'aquamarine2', color = 'aquamarine4')
+y5 = ggplot(data = df, mapping = aes(x = emps_sup, y = salary)) + geom_point(fill = 'green2', color = 'green4')
+y6 = ggplot(data = df, mapping = aes(x = experience, y = salary)) + geom_point(fill = 'yellow2', color = 'yellow4')
+y7 = ggplot(data = df, mapping = aes(x = factor(gender), y = salary)) + geom_boxplot(fill = 'orange2', color = 'orange4')
+y8 = ggplot(data = df, mapping = aes(x = factor(int_res), y = salary)) + geom_boxplot(fill = 'red2', color = 'red4')
+y9 = ggplot(data = df, mapping = aes(x = profit, y = salary)) + geom_point(fill = 'maroon2', color = 'maroon4')
+y10 = ggplot(data = df, mapping = aes(x = sales, y = salary)) + geom_point(fill = 'deeppink2', color = 'deeppink4')
+plot_grid(y1, y2, y3, y4, y5, y6, y7, y8, y9, y10)
+```
+Visual Descriptions:
+
+* The distribution for males (1) is higher than the distribution for females (0). 
+
+* The distribution for board members (1) and non-board members (0) are approximately the same. The distribution for non-board members is slightly higher than board members. 
+
+* The distribution for people that do not have international responsibility (0) is significantly higher than people who do have international responsibility (1). 
+
+* The distribution for people with 20 years of education is significantly lower than the distribution for people with 12.5 years to less than 20 years of education. 
+
+* The greatest distribution for age is between 30 years and 45 years. 
+
+* The distribution of people 60 years of age and older are the lowest compared to the distribution of people between the ages of 30 and 45 years of age.
+
+* The mean salary for males (1) is higher than the mean salary for females (0).
+
+* There is a positive linear relationship between a person's experience (in years) and their salary. 
+
+* There is a positive linear relationship between a person's age and their salary. 
+
+* The mean salaries for people with international responsibility (1) and with no international responsibility (0) are approximately even. 
+
+
+## Creating Linear Models
+
+### Experience, Education, Gender, and Assets: Parallel Slopes Model
+
+Using a linear model with parallel slopes, we can predict an executive's salary (in millions) based on their experience, education, gender, and assets. 
+
+```{r include=FALSE}
+#getting correlation
+df %>% cor()
+```
+
+`experience`, `education`, `gender`, and `assets` all have significant positive correlation to `salary` that will be included in our linear model. 
+
+``` {r include=FALSE}
+salary_model <- lm(salary ~ experience + education + gender + assets, data = df)
+summary(salary_model)
+```
+
+```{r}
+ggplot(salary_model, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+> $\hat{Salary} = 10.14 + 0.027 \cdot experience + 0.022 \cdot education + 0.003 \cdot assets + 0.185 \cdot 1_{Male}(x)$
+
+Male executive model: $\hat{Salary} = 10.325 + 0.027 \cdot experience + 0.022 \cdot education + 0.003 \cdot assets$
+
+Female executive model: $\hat{Salary} = 10.14 + 0.027 \cdot experience + 0.022 \cdot education + 0.003 \cdot assets$
+
+In our base model, we could extrapolate that executives have a salary of $10.14 million assuming they have no experience and no education, With every extra year of experience and education, one could expect their salary to increase by \$27,000 and \$22,000 million respectively. Male exexcutives, on average, make \$185,000 more than their female counterparts with similar experience, education, and assets.
+
+### Experience & Gender: Interaction Model
+
+Using an interaction model, we can use both the `experience` and `gender` variables to see how they interact with each other in terms of salary.
+
+```{r include=FALSE}
+expGen_model <- lm(salary ~ experience + gender + experience*gender, data = df)
+get_regression_table(expGen_model)
+```
+
+> $\hat{score} = 11 + 0.026 \cdot experience + 0.174 \cdot 1_{Male}(x) + 0.002 \cdot experience \cdot 1_{Male}(x)$
+
+Female experience model: $\hat{score}_F = 11 + 0.026 \cdot experience$
+
+Male experience model: > $\hat{score}_M = 11.174 + 0.028 \cdot experience$
+
+```{r echo=FALSE}
+ggplot(data = df_factor, mapping = aes(x = experience, y = salary, color = gender)) + 
+    geom_point() +
+    labs(x = "Experience", y = "Salary (Million)", title = "Experience and Gender: Interaction Model") +
+    geom_abline(intercept = 11, slope = 0.026, color = "tomato", lwd=1) +
+    geom_abline(intercept = 11.174, slope = 0.028, color = "mediumturquoise", lwd=1)
+```
+
+As we can see from the models, male executives have both higher base salaries than women in addition to marginally higher increase in salaries with an increase in experience. However, as evidenced from the graph, this interaction between `experience` and `gender` is negligible, as both genders encounter an increase in pay at the same rate.
+
+### Experience & Education: Another Model
+
+Intuitively, education and experience are the most important variables in predicting an executive’s salary. On the plot below, experience and education (both in years) are displayed on the floor axes. On the vertical axis, the salary is displayed. The salary is also color-coded, with higher salaries being represented by more ‘hot’ colors. From the graph alone, we can see that more education and more experience is crucial to having a higher salary in an executive position.
+
+```{r}
+p3d <- plot_ly(data = df, x = ~experience,  y = ~education, z = ~salary, opacity = 0.6, color = df$salary) %>% add_markers()
+p3D
+```
+

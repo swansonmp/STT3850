@@ -1,0 +1,151 @@
+---
+title: "Exam 1 Reference Sheet"
+author: "Matthew Swanson"
+date: "9/19/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(resampledata)
+library(dplyr)
+library(knitr)
+library(nycflights13)   #get the data
+```
+
+#Vectors and Matrices
+```{r}
+seq_vec = seq(1,19,2)                               #seq([first],[last],[inc])
+seq_mat = matrix(seq_vec, nrow = 2, byrow = TRUE)   #matrix([vec],nrow=[int],ncol=[int],byrow=[bool])
+seq_mat
+```
+
+```{r include=FALSE}
+nv <- c(1, 3, 6, 8)                 #make the vecs
+cv <- c("a", "v", "f", "p")
+lv <- c(TRUE, FALSE, FALSE, TRUE)
+DF1 <- data.frame(nv, cv, lv)       #create the data frame using the vecs as args
+```
+
+```{r}
+#subsets (two ways)
+subset(DF1, subset = lv == TRUE)    #subset([df], subset = [lexp])
+DF1[lv == TRUE, ]
+subset(DF1, subset = nv > 5)        #grabs rows 3 and 4
+#order
+order(seq_vec)                      #ret pos of elements that'd make the ordered vector
+#frame heads
+#head(ChickWeight[order(ChickWeight$weight),], n = 5)    #get 5 lightest chickens
+```
+
+#List
+```{r}
+#my_matrix <- matrix(1:9, byrow = TRUE, nrow = 3)
+#my_df <- DF1
+#my_list <- list(my_vector, my_matrix, my_df)                #unnamed list
+#my_list2 <- list(Vector = my_vector, Matrix = my_matrix)    #named list
+#my_list2$Matrix         #selecting the matrix from the list (the 2nd element)
+```
+
+```{r fig.height = 3, fig.width = 3}
+data = c(5,6,6,8,9,11,11,14,17,17,19,20,21,21,22,23,24,32,40,43,49)
+mean(data, trim = 0.25) #trim mean
+IQR(data) #iqr
+summary(data) #fivenum
+```
+
+```{r fig.height = 2, fig.width = 2}
+df = data.frame(data)
+```
+##Boxplot
+```{r fig.height = 2, fig.width = 2}
+ggplot(data = df, mapping = aes(y = data)) +
+  geom_boxplot()
+```
+##Histogram
+```{r fig.height = 2, fig.width = 2}
+ggplot(data = df, mapping = aes(x = data)) +
+  geom_histogram(bins = 10)
+```
+##QQ Plot
+```{r fig.height = 2, fig.width = 2}
+ggplot(data = df, aes(sample = data)) +
+  geom_qq() + geom_qq_line()
+```
+##Scatter and Line (Ex. Flights)
+```{r fig.height = 2, fig.width = 2}
+data(flights)       #load data frame into session
+#filter
+all_alaska_flights <- flights %>%   #pipe operator
+  filter(carrier == "AS")           #filter([expr related to colname])
+#scatter
+ggplot(data = all_alaska_flights, mapping = aes(x = dep_delay, y = arr_delay)) + 
+    geom_point() # or geom_point(alpha = 0.2) or geom_jitter(width = 30, height = 30)
+#line
+early_january_weather <- weather %>% 
+  filter(origin == "EWR" & month == 1 & day <= 15)
+ggplot(data = early_january_weather, mapping = aes(x = time_hour, y = temp)) +
+  geom_line()
+#facets
+ggplot(data = weather, mapping = aes(x = temp, fill = factor(month))) +
+  geom_histogram(binwidth = 10, color = "white") + facet_wrap(~ month)
+```
+
+# Hypothesis Testing
+
+Do men consume more hotwings than women?
+
+Define the null and alternative hypothesis:
+
+$H_0: \mu_M - \mu_F = 0$
+
+$H_a: \mu_M - \mu_F > 0$
+
+pvalue = 0.0008 < 0.05, so we reject $H_0$
+
+There is enough evidence to conclude that, on average, men consume more hot wings than women
+
+*Suppose that alpha = 0.000001*
+
+pvalue = 0.0008 > alpha, so we fail to reject $H_0$
+
+There is not enough evidence to conclude that, on average, men consume more hot wings than women
+
+Load General Social Survery data into R (from section 1.7)
+
+```{r}
+library(resampledata)
+data(GSS2002)
+```
+
+Create a table and a bar chart of the responses to the question about the death penalty.
+
+```{r}
+table(GSS2002$DeathPenalty)
+ggplot(data = GSS2002, aes(x = DeathPenalty)) +
+  geom_bar(fill = "red4")
+```
+
+Use the `table` command and the `summary` command in R on the gun ownership variable. What additional infomation does the `summary` command give that the `table` command does not?
+
+```{r}
+table(GSS2002$OwnGun)
+summary(GSS2002$OwnGun)
+```
+
+Create a contingency table displaying the realtionship between opinions about the death penalty to that about gun ownership.
+
+```{r}
+table(GSS2002$DeathPenalty, GSS2002$OwnGun)
+```
+
+What proportion of gun owners favor the death penalty? Does it appear to be different from the proportion among those who do not own guns?
+
+```{r}
+gunprop <- GSS2002 %>%
+  group_by(OwnGun) %>%
+  summarize(prop = mean(DeathPenalty == "Favor", na.rm = TRUE))
+
+kable(gunprop)
+```

@@ -1,0 +1,44 @@
+---
+title: "Quiz 4"
+author: "Matthew Swanson"
+date: "9/26/2019"
+output: html_document
+---
+
+1.
+```{r}
+library(resampledata)
+data(Recidivism)
+```
+
+2.
+```{r}
+str(Recidivism)
+```
+
+3.
+```{r}
+library(ggplot2)
+ggplot(data = Recidivism, mapping = aes(x = Recid)) +
+  geom_bar()
+table(Recidivism$Recid)
+```
+
+4.
+```{r}
+table(Recidivism$Age25, Recidivism$Recid)
+```
+
+5.
+```{r}
+library(tidyverse)
+library(knitr)
+
+age25_back <- Recidivism %>%
+    group_by(Age25) %>%
+    summarize(Proportion = mean(Recid == "Yes"))
+
+kable(age25_back)
+```
+
+

@@ -1,0 +1,33 @@
+---
+title: "Quiz 7"
+author: "Matthew Swanson"
+date: '20191017'
+output: bookdown::html_document2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1.
+
+```{r}
+library(resampledata)
+data("Beerwings")
+```
+
+2.
+
+```{r}
+Beer_model = lm(Beer ~ Hotwings, data = Beerwings)
+Beer_model
+```
+
+
+5. 
+
+```{r}
+library(ggplot2)
+ggplot(Beer_model, aes(x = .fitted, y = .resid)) + geom_point()
+```
+

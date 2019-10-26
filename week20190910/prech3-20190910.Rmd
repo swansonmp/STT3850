@@ -1,0 +1,73 @@
+---
+title: "Pre-CH 3 MSWR"
+author: "Matthew Swanson"
+date: "20190910"
+output:
+    bookdown::html_document2:
+    highlight: textmate
+    theme: yeti
+---
+
+# The `for` loop in R
+
+## Loop through the sequence 1 to 5 printing the square of each number
+
+```{r}
+for (i in 1:5) {
+    print(i)
+}
+```
+
+## We can capture the results of our loop in a list
+
+Create a vector and then fill in its values
+
+```{r}
+vec = rep(NA, 5)
+vec
+
+for (i in 1:5) {
+    vec[i] = i^2
+}
+vec
+```
+
+
+## Sum the first 100 squares
+
+```{r}
+n = 0
+for (i in 1:100) {
+    n = n + i^2
+}
+n
+
+#done with vectors
+vec = rep(NA, 100)
+for (i in 1:100) {
+    vec[i] = i^2
+}
+sum(vec)
+```
+
+
+## Use a for loop to print the following:
+
+> “The year is 2010”
+>
+> “The year is 2011”
+>
+> “The year is 2012”
+>
+> “The year is 2013”
+>
+> “The year is 2014”
+>
+> “The year is 2015”
+
+```{r}
+for (i in 2010:2015) {
+    cat("The year is ", i, "\n")
+}
+```
+

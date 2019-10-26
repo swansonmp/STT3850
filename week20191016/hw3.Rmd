@@ -1,0 +1,180 @@
+---
+title: "HW 3, CH 6 MD HW"
+author: "Matthew Swanson"
+date: '20191022'
+output: bookdown::html_document2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Orange Juice
+
+```{r}
+load("OJUICE.Rdata")
+head(OJUICE)
+```
+
+1. Suppose a manufacturer wants to use to predict the sweetness ($y$) from the amount of pectin ($x$)
+    
+    i. Conduct Exploratory data analysis (Note: This constists of three parts)
+
+a. Looking at the raw values:
+
+```{r}
+head(OJUICE)
+#View(OJUICE)
+```
+
+b. Computing and describing the summary statistics likes means, medians, and standard deviations. Specially the correlation coefficient:
+
+```{r}
+library(skimr)
+OJUICE %>% skim()
+
+cor(x = OJUICE$PECTIN, y = OJUICE$SWEET)
+```
+
+* *The mean amount of pectin is 257 while the median is 244, meaning there are some high-value outliers*
+* *The mean amount of sweetness is 5.66 while the median is 5.7. Sweetness follows a uniform distribution*
+* *The std dev of pectin is 50 while the st dev of sweetness is 0.24*
+* *75% of observed pectin values fall between 210 and 265*
+* *The highest observed pectin value is 410*
+* *25% of observed pectin values fall between 226 and 244*
+* *Only 25% of observed pectin values are between 265 and 410*
+* *The maximum sweetness is 5.2 while the maximum sweetness is 6*
+* *50% of observed sweetness values fall between 5.5 and 5.82*
+* *The correlation coefficient between pectin and sweetness is -0.48, meaning there is some negative correlation.*
+
+c. Creating and describing data visualizations:
+
+```{r}
+library(ggplot2)
+library(cowplot)
+
+pp = ggplot(data = OJUICE, mapping = aes(x = PECTIN)) +
+  geom_histogram(binwidth = 25, fill = 'red2', color = 'red4')
+ps = ggplot(data = OJUICE, mapping = aes(x = SWEET)) +
+  geom_histogram(binwidth = 0.1, fill = 'blue2', color = 'blue4')
+plot_grid(pp, ps)
+
+ggplot(data = OJUICE, mapping = aes(x = PECTIN, y = SWEET)) + 
+    geom_point() +
+    labs(x = "Pectin", y = "Sweetness", title = "Relationship Between Sweetness and Pectin") +
+    geom_smooth(method = "lm")
+```
+
+* Most of the pectin observed values vall in between 215 and 285
+* The sweetness values are pretty normally distributed, with slightly more falling between 5.7 and 6
+* There is some negative correlation between sweetness and pectin
+
+ii. Fit the model and write the equation.
+
+``` {r}
+sweet_model <- lm(SWEET ~ PECTIN, data = OJUICE) #y ~ x
+sweet_model
+```
+
+> $\hat{Sweetness} = 6.252068 - 0.002311 \cdot Pectin$
+
+iii. Give a practical interpretation of the value of b0, if possible.
+
+> $b_0$ *is the y-intercept for our linear model. It could mean that for a pectin value of 0, you could expect a sweetness value of 6.25. However, since out lowest pectin value is around 200, that would be extrapolation, rendering* $b_0$ *as meaningless*
+
+iv. Give a practical interpretation of the value of b1, if possible.
+
+> *Every time we increase the pectin value by 1, our expected sweetness value decreases by -0.002311*
+
+v. Predict the sweetness index if amount of pectin in the orange juice is 300 ppm.
+
+`> 6.252068 - 0.002311 * 300`
+
+    5.558768
+
+vi. Figure out a way to do v. in R. (We did not discussed this in class)
+
+```{r}
+newx = data.frame(PECTIN = 300)
+predicted_sweet = predict(sweet_model, newx)
+predicted_sweet
+```
+
+vii. Conduct diagnostics and comment on how “good” the model is.
+
+```{r}
+library(moderndive)
+regression_points <- get_regression_points(sweet_model)
+regression_points
+
+ggplot(sweet_model, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+> Based on the residual plot, it seems that the model is not very good. The correlation between sweetness and pectin is too low to create an accurate linear model.
+
+# Credit
+
+```{r}
+library(ISLR)
+data(Credit)
+```
+
+1. Suppose we want to use to predict the `Balance` ($y$) from the `Ethnicity` ($x$)
+
+i. Conduct Exploratory data analysis
+
+a. Looking at the raw values:
+
+```{r}
+head(Credit)
+#View(Credit)
+#Income in 10s of thousands
+```
+
+b. Computing and describing the summary statistics likes means, medians, and standard deviations. Specially the correlation coefficient:
+
+```{r}
+library(dplyr)
+credit = Credit %>% select(Balance, Ethnicity)
+credit %>% skim()
+
+tbl = credit %>%
+    group_by(Ethnicity) %>%
+    summarize(Min = min(Balance), Mean = mean(Balance), Median = median(Balance), Max = max(Balance), SD = sd(Balance), N = n())
+kable(tbl)
+
+Balance_model <- lm(Balance ~ Ethnicity, data = credit)
+Balance_model
+summary(Balance_model)
+```
+
+* The minimum balance for all ethnicities was 0.
+* Every ethnicity has a balance distribution that is heavily skewed towards a higher balance.
+* AfricanAmericans have the highest mean balance at 531, Caucasians at 518, and Asians with the lowest at 512.
+* Asians have the lowest median balance at 414, Caucasians at 465, and AfricanAmericans with the highest at 480.
+* A Caucasian person holds by far the largest balance with 1999
+* African Americans have the highest spread regarding balance ($\hat{\sigma}$ = 486)
+* Caucasians have by far the lowest spread regarding balance ($\hat{\sigma}$ = 437)
+
+c. Creating and describing data visualizations, individual and comparisons:
+
+```{r}
+ggplot(data = credit, mapping = aes(x = Balance, fill = factor(Ethnicity))) +
+    geom_histogram(binwidth = 250, color = 'white') + 
+    labs(x = "Balance", y = "Count", title = "Balance by Ethnicity") + 
+    facet_wrap(~ Ethnicity, nrow = 1)
+```
+
+* Caucasians make up half of all observations
+* The highest observed balance by far (~$2000) is of a Caucasian person
+* Asians have more observed values around zero than AfricanAmericans
+
+ii. Fit the model and write the equation.
+
+$\hat{Balance} = 531.00 - 18.69 \cdot 1_{Asia}(x) - 12.50 \cdot 1_{Cauc}(x)$
+
+iii. Give a practical interpretations of all coefficients and fitted values.
+
+* $b_0 = Intercept = 531$: the mean balance for AfricanAmericans (our baseline)
+* $b_{Asia} = EthnicityAsian = -18.69$: the difference in balance between Asians relative to AfricanAmericans, or in other words, on average Asians had balance $\$-18.69$ less.
+* $b_{Cauc} = EthnicityCaucasian = -12.50$: the difference in balance between Caucasians relative to AfricanAmericans, or in other words, on average Caucasians had balance $\$-12.50$ less.

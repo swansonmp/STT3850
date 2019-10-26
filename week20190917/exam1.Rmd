@@ -1,0 +1,47 @@
+---
+title: "Exam 1"
+author: "Matthew Swanson"
+date: "9/19/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center", comment = NA)
+library(tidyverse)
+library(resampledata)
+library(nycflights13)
+library(knitr)
+```
+
+```{r}
+data(FlightDelays)
+
+str(FlightDelays)
+
+ggplot(data = FlightDelays, mapping = aes(y = FlightLength)) +
+  geom_boxplot()
+
+ggplot(data = FlightDelays, aes(x = Destination)) +
+  geom_bar()
+
+Delayed30 <- FlightDelays %>% filter(Delay >= 30)
+ggplot(data = FlightDelays, mapping = aes(x = Delayed30, y = FlightLength)) +
+  geom_boxplot()
+
+delayTable <- FlightDelays %>%
+  group_by(Day) %>%
+  summarize(mean(Delay), sd(Delay), median(Delay), IQR(Delay))
+kable(delayTable)
+
+data(MobileAds)
+glimpse(MobileAds)
+
+diff = MobileAds$m.cpc_post - MobileAds$m.cpc_pre
+diff = data.frame(diff)
+ggplot(data = diff, mapping = aes(x = diff)) +
+  geom_histogram(bins = 10)
+
+ggplot(data = diff, aes(sample = diff)) +
+  geom_qq() + geom_qq_line()
+```
+

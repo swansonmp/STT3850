@@ -1,0 +1,77 @@
+---
+title: "HW1"
+author: "Matthew Swanson"
+date: "9/18/2019"
+output: html_document
+---
+
+1. Exercise 2.7 MODIFIED:
+
+Import data from the black spruce case study in Section 1.10 in to `R`.
+
+> Solution: 
+
+```{r}
+library(resampledata)
+data(Spruce)
+```
+
+a. Compute the numeric summaries for the height changes (`Ht.change`) of the seedlings.
+
+> Solution:
+
+```{r}
+summary(Spruce$Ht.change)
+```
+
+b. Create a histogram and normal quantile plot for the height changes of the seedlings. Is the distribution approximately normal?
+
+> Solution:
+
+```{r}
+library(ggplot2)
+ggplot(data = Spruce, mapping = aes(x = Ht.change)) +
+  geom_histogram(bins = 8)
+
+ggplot(data = Spruce, aes(sample = Ht.change)) +
+  geom_qq() + geom_qq_line()
+```
+
+**The distribution looks approximately normal.**
+
+c. Create a boxplot to compare the distribution of the change in diameters of the seedlings (`Di.change`) grouped by whether or not they were in fertilized plots. Describe the graph.
+
+> Solution:
+
+```{r}
+ggplot(data = Spruce, aes(x = Fertilizer, y = Di.change)) + 
+    geom_boxplot()
+```
+
+**Fertilized seeds have a greater average diameter change than non-fertilized seeds. Fertilized seeds have a greater variability in diameter change than non-fertilized seeds.**
+
+d. Use Data Wrangling via `dplyr` to find the numeric summaries of the diameter changes for the two levels fertilization.
+
+> Solution:
+
+```{r}
+library(dplyr)
+library(knitr)
+
+df <- Spruce %>%
+  group_by(Fertilizer) %>%
+  summarize(min(Di.change), mean(Di.change), median(Di.change), max(Di.change), IQR(Di.change), sd(Di.change))
+
+kable(df)
+```
+
+e. Use `ggplot` to create a scatter plot of the height changes against the diameter changes, describe the relationship.
+
+> Solution:
+
+```{r fig.height = 3, fig.width = 3, fig.align = "center"}
+ggplot(data = Spruce, mapping = aes(x = Di.change, y = Ht.change)) + 
+    geom_point()
+```
+
+**As the change in diameter increases, the change in height increases.**

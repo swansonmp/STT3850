@@ -1,0 +1,42 @@
+---
+title: "Quiz 5"
+author: "Matthew Swanson"
+date: "10/3/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#1
+library(resampledata)
+data(Beerwings)
+
+#2
+str(Beerwings)
+
+#3
+#a
+
+#b
+library(dplyr)
+ans = Beerwings %>%
+  group_by(Gender) %>%
+  summarize(Mean = mean(Beer), N = n())
+md = ans[2,2] - ans[1,2]
+observed = md$Mean
+set.seed(555)
+sims <- 9999 # Number of simulations (iterations)
+ans <- numeric(sims)
+for(i in 1:sims){
+  index <- sample.int(n = 30, size = 15, replace = FALSE)
+  ans[i] <- mean(Beerwings$Beer[index]) - mean(Beerwings$Beer[-index])
+}
+pvalue <- (sum(ans >= observed) + 1)/(sims + 1)
+pvalue
+```
+
+
+
