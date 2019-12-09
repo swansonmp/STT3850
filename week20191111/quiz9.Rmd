@@ -1,0 +1,30 @@
+---
+title: "Quiz 9"
+author: "Matthew Swanson"
+date: "11/17/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+2.
+
+```{r}
+pnorm(8000, mean = 10000, sd = 10000/sqrt(30))
+```
+
+3. 
+
+```{r}
+set.seed(888)
+sims = 10000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = rexp(n = 30, rate = 1/10000)
+    Xbars[i] = mean(x)
+}
+mean(Xbars < 8000)
+```
+

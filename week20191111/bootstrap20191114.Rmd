@@ -1,0 +1,625 @@
+---
+title: "Confidence Intervals"
+author: "Matthew Swanson"
+date: "20191114"
+output:
+    bookdown::html_document2:
+    highlight: textmate
+    theme: yeti
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(skimr)
+```
+
+# Introduction to the Bootstrap
+
+Rather than repeatedly obtaining independent data sets from the population, we instead obtain distinct data sets by *repeatedly sampling observations* from the original data set with replacement. This process is known as the Bootstrap process.
+
+*Bootstrap sample size is $n$, which is the size of the original sample as well.*
+
+> The Bootstrap Idea: The original sample approximates the population from which it was drawn. So resamples from this sample approximate what we would get if we took many samples from the population. The bootstrap distribution of a statistic, based on many resamples, approximates the sampling distribution of the statistic, based on many samples.
+
+**Bootstrap for a single population: **
+
+Given a sample of size $n$ from a population:
+
+1. Draw a resample of size $n$ with replacement from the sample.
+2. Compute a statistic that describes the sample, such as the sample mean.
+3. Repeat this resampling process many times, say 10,000.
+4. Construct the bootstrap distribution of the statistic. Inspect its spread, bias, and shape.
+
+## Example 
+
+We will investigate samples taken from the CDC’s database of births. For the North Carolina data: `NCBirths2004`, we are interested in μ, the true birth weight mean for all North Carolina babies born in 2004.
+
+```{r}
+library(resampledata)
+library(ggplot2)
+data(NCBirths2004)
+set.seed(13)
+head(NCBirths2004)
+
+mean(NCBirths2004$Weight) # Investigate the sample mean of the Weight
+
+# This is how the sample Weight is distributed
+ggplot(data = data.frame(NCBirths2004), aes(x = Weight)) + 
+  geom_histogram(fill = "gray", color = "black") + 
+  geom_vline(xintercept  = mean(NCBirths2004$Weight), color = "blue") +
+  labs(x = "X: Weight", title = "Weights for NC births") + 
+  theme_bw() 
+
+# Let's start bootstrapping now!
+BirthWeightSample <- NCBirths2004$Weight # This is my original SAMPLE 
+n <- length(BirthWeightSample) # This is the original sample size
+
+B <- 10000  # The number of bootstrap samples
+boot_Mean_Wt <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+
+for (i in 1:B){
+  x <- sample(BirthWeightSample, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_Mean_Wt[i] <- mean(x)
+}
+
+mean(boot_Mean_Wt) # This is the mean of the bootstrap means - so the center of the bootstrap distribution
+sd(boot_Mean_Wt) # This is the standard error of the bootstrap distribution
+
+# Now plot the bootstrap distribution
+ggplot(data = data.frame(x = boot_Mean_Wt), aes(x = x)) + 
+  geom_histogram(fill = "lightblue", color = "black") + 
+  geom_vline(xintercept  = mean(boot_Mean_Wt), color = "red") +
+  labs(x = substitute(paste(bar(X),"* (g)")), 
+       title = "Bootstrap distribution of means for NC birth weights") + 
+  theme_bw() 
+```
+
+> Note: We use * to denote the bootstrap estimates. For example, $\bar{X}^*_1$ would be the mean from the first bootstrap sample.
+
+Definition 1.1 The bias of the bootstrap estimate is the mean of the bootstrap distribution, minus the estimate from the original data.
+
+$Bias_{boot}[\hat{\theta}^*] = E[\hat{\theta}^*] - \hat{\theta},$
+
+Bootstrap estimate is unbiased if the Bias is zero.
+
+Here $\theta$ can be the mean for example.
+
+## Example
+
+Find the bias of the bootstrap mean for the previous example.
+
+```{r}
+Bias = mean(boot_Mean_Wt) - mean(BirthWeightSample)
+Bias
+```
+
+## Example
+
+Arsenic is a naturally occurring element in the groundwater of Bangladesh. However, much of this groundwater is used for drinking water by rural populations, so arsenic poisoning is a serious health issue.
+
+The data frame `Bangladesh` consists infomation about of 271 wells in Bangladesh.
+
+1. Load the Bangladesh data from the library resampledata.
+
+```{r}
+data("Bangladesh")
+```
+
+2. Find the sample mean of the arsenic concentrations for these 271 wells.
+
+```{r}
+mean(Bangladesh$Arsenic)
+```
+
+3. Plot and comment about how the arsenic concentrations for these 271 wells are distributed.
+
+```{r}
+# Distribution is skewed right
+ggplot(data = Bangladesh, aes(x = Arsenic)) + 
+  geom_histogram(fill = "gray", color = "black") + 
+  geom_vline(xintercept  = mean(Bangladesh$Arsenic), color = "blue") +
+  theme_bw() 
+```
+
+4. Find the mean and the standard error of the bootstrap distribution of the mean arsenic concentrations.
+
+```{r}
+WellSample <- Bangladesh$Arsenic # This is my original SAMPLE 
+n <- length(WellSample) # This is the original sample size
+
+B <- 10000  # The number of bootstrap samples
+boot_Mean <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+
+for (i in 1:B){
+  x <- sample(WellSample, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_Mean[i] <- mean(x)
+}
+
+mean(boot_Mean) # This is the mean of the bootstrap means - so the center of the bootstrap distribution
+sd(boot_Mean) # This is the standard error of the bootstrap distribution
+```
+
+5. Plot and comment about bootstrap distribution of the mean arsenic concentrations.
+
+```{r}
+ggplot(data = data.frame(x = boot_Mean), aes(x = x)) + 
+  geom_histogram(fill = "gray20", color = "black") + 
+  geom_vline(xintercept  = mean(boot_Mean), color = "red") +
+  labs(x = substitute(paste(bar(X),"* (g)")), 
+    title = "Bootstrap distribution of means for Arsenic in Bangladesh wells") + 
+  theme_bw() 
+```
+
+6. Find the bias of the bootstrap mean.
+
+```{r}
+Bias = mean(boot_Mean) - mean(WellSample)
+Bias
+```
+
+# Bootstrap Percentile Confidence Intervals
+
+The sample mean $\bar{X}$ gives an estimate of the true mean $\mu$, but it probably does not hit it exactly. It would be nice to have a range of values for the true $\mu$ that we are 95% sure includes the true $\mu$.
+
+In the North Carolina birth weights case study, the bootstrap distribution shows roughly how sample means vary for samples of size 1009. If most of the sample means are concentrated within a certain interval of the bootstrap distribution, it seems reasonable to assume that the true mean is most likely somewhere in that same interval.
+
+Thus, we can construct what is called a *95% confidence interval* by using the 2.5 and 97.5 percentiles of the bootstrap distribution as endpoints. We would then say that we are 95% confident that the true mean lies within this interval. These type of confidence intervals are called the *bootstrap percentile confidence intervals*.
+
+Definition: Bootstrap Percentile Confidence Intervals
+
+The interval between 2.5 and 97.5 percentiles of the bootstrap distribution of a statistic is a 95% bootstrap percentile confidence interval for the corresponding parameter.
+
+## Example
+
+Find and interpret the 95% bootstrap percentile confidence interval for the mean weight of North Carolina babies.
+
+```{r}
+# We use the `quantile` command
+quantile(boot_Mean_Wt, probs = c(0.025, 0.975))
+
+# Here is a picture
+ggplot(data = data.frame(x = boot_Mean_Wt), aes(x = x)) + 
+  geom_histogram(fill = "lightblue", color = "black") + 
+  geom_vline(xintercept  = c(3417.420, 3478.906), color = "blue") +
+  geom_text(aes(x=3417.420, label="Lower Confidance Limit\n", y=500), colour="blue", angle=90, text=element_text(size=11))+
+  geom_text(aes(x=3478.906, label="\n Upper Confidance Limit", y=500), colour="blue", angle=90, text=element_text(size=11))+
+  geom_vline(xintercept  = c(mean(boot_Mean_Wt)), color = "red") +
+  labs(x = substitute(paste(bar(X),"* (g)")), 
+       title = "Bootstrap distribution of means for NC birth weights With Confidance Limits") + 
+  theme_bw() 
+```
+
+For the North Carolina birth weights, the interval marked by the 2.5 and 97.5 percentiles is (3417.42, 3478.91). Thus, we would state that we are 95% confident that the true mean weight of North Carolina babies born in 2004 is between 3417.42 and 3478.91 g.
+
+## Example
+
+Find and interpret the 95% bootstrap percentile confidence interval for the true mean arsenic level in the Bangladesh wells.
+
+```{r}
+quantile(boot_Mean, probs = c(0.025, 0.975))
+
+lq = 92.28111
+hq = 163.04943
+
+ggplot(data = data.frame(x = boot_Mean), aes(x = x)) + 
+  geom_histogram(fill = "grey20", color = "black") + 
+  geom_vline(xintercept  = c(lq, hq), color = "blue") +
+  geom_text(aes(x=lq, label="Lower Confidance Limit\n", y=500), colour="blue", angle=90, text=element_text(size=11))+
+  geom_text(aes(x=hq, label="\n Upper Confidance Limit", y=500), colour="blue", angle=90, text=element_text(size=11))+
+  geom_vline(xintercept  = c(mean(boot_Mean)), color = "red") +
+  labs(x = substitute(paste(bar(X),"* (g)")), 
+       title = "Bootstrap distribution of means for arsenic in wells in Bangladesh") + 
+  theme_bw() 
+```
+
+## Example 
+
+In addition to the arsenic concentration for 271 wells, the Bangladesh data set contains chlorine concentration.
+
+a. Run the skim() command on the Chlorine column and notice the missing values (NA values)
+b. Use the following code to remove the missing values (NA values).
+
+```{r}
+# Removing missing values
+data_no_na <- Bangladesh %>%
+  filter(!is.na(Chlorine)) 
+
+skim(data_no_na) # Run this to check if the missing values are gone from the Chlorine column
+chlorine_concentration <- data_no_na$Chlorine # This is the original sample now.
+```
+
+c. Bootstrap the mean (Find and plot)
+
+```{r}
+#CI = (55, 105)
+```
+
+d. Find and interpret the 95% bootstrap percentile confidence interval for the true mean Chlorine level in the Bangladesh wells.
+
+## Example
+
+In addition to the arsenic concentration for 271 wells, the Bangladesh data set contains chlorine concentration.
+
+a. Bootstrap the 25% trimmed mean (Find and plot)
+
+```{r}
+
+
+B <- 10000  # The number of bootstrap samples
+boot_TrMean_Ch <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+
+for (i in 1:B){
+  x <- sample(chlorine_concentration, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_TrMean_Ch[i] <- mean(x, time = 0.25)
+}
+
+mean(boot_TrMean_Ch)
+
+quantile(boot_TrMean_Ch, probs = c(0.025,0.975))
+lq = 54.96898
+hq = 104.56465
+
+ggplot(data = data.frame(x = boot_TrMean_Ch), aes(x = x)) + 
+  geom_histogram(fill = "steelblue", color = "white") + 
+  geom_vline(xintercept  = c(lq, hq), color = "blue") +
+  geom_text(aes(x=lq, label="Lower Confidence Limit\n", y=500), colour="blue", angle=90, text=element_text(size=11))+
+  geom_text(aes(x=hq, label="\n Upper Confidence Limit", y=500), colour="blue", angle=90, text=element_text(size=11))+
+  geom_vline(xintercept  = c(mean(boot_TrMean_Ch)), color = "red") +
+  labs(x = substitute(paste(bar(X),"* (g)")), 
+       title = "Bootstrap distribution of trimmed means for chlorine in wells in Bangladesh") + 
+  theme_bw()
+```
+
+b. Compare your results with the usual mean in the previous exercise.
+
+```{r}
+
+```
+
+# Two Sample Bootstrap
+
+We now turn to the problem of comparing two samples. In general, bootstrapping should mimic how the data were obtained. So the data correspond to independent samples from two populations, we should draw to samples that way. Then we proceed to compute the same statistic comparing the samples as per the original data, for example, difference in means or ratio of proportions.
+
+## Two Independent Samples
+
+Bootstrap for comparing two polulations:
+
+Given independent samples of sizes $m$ and $n$ from two populations,
+
+1. Draw a resample of size $m$ with replacement from the first sample in a separate resample of size $n$ for the second sample. Compute a statistic that compares the two groups, such as the *difference between the two sample means*.
+2. Repeat this resampling process many times say 10,000.
+3. Construct the bootstrap distribution of the statistic. Inspect its spread, bias, and shape.
+
+### Example
+
+Do men take more physical risks in the presence of an attractive women?
+
+Two psychologists in Australia conducted an experiment to explore this question. Male skateboarders were randomly assigned to perfom tricks in presence of an attractive Female Experimenter or a Male Experimenter.
+
+Use the dataframe `Skateboard` from the library `resampledata` to create a 95% bootstap confidence interval for the difference in `Testosterone` levels when there is a Female Experimenter or a Male Experimenter present.
+
+```{r}
+data("Skateboard")
+```
+
+1. Filter out the `Testosterone` sample with Female Experimenter and name it `Ori_Female_sample`
+
+```{r}
+Ori_Female_sample = Skateboard %>% filter(Experimenter == "Female") %>% select(Testosterone)
+```
+
+2. Filter out the `Testosterone` sample with Male Experimenter and name it `Ori_Male_sample`
+
+```{r}
+Ori_Male_sample = Skateboard %>% filter(Experimenter == "Male") %>% select(Testosterone)
+```
+
+3. Find the sizes of each sample. Call those `nf` and `nm`
+
+```{r}
+nf = nrow(Ori_Female_sample)
+nm = nrow(Ori_Male_sample)
+```
+
+4. Bootstrap the difference between the sample means for above two samples.
+
+```{r}
+B <- 10000  # The number of bootstrap samples
+boot_sk8 <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+
+for (i in 1:B){
+  x <- sample(Ori_Female_sample$Testosterone, size = nf, replace = TRUE) # Here n is the size of your bootstrap sample
+  y <- sample(Ori_Male_sample$Testosterone, size = nm, replace = TRUE)
+  boot_sk8[i] <- mean(x) - mean(y) #female - male
+}
+```
+
+5. Find a 95% percentile interval (bootstrap CI) for the
+
+```{r}
+quantile(boot_sk8, probs = c(0.025,0.975))
+```
+
+6. Be sure to know how to interpret the CI.
+
+**We are 95% confident that the testosterone level is higher when a female experimenter was present by between $24.5$ and $135.7$**
+
+7. Answer the original research question.
+
+**Yes, men have higher testosterone levels when observed by a female experimenter.**
+
+$\bar{X}_F-\bar{X}_M=(23.5,135.7)>0$
+
+## Match pairs (Two Dependent Samples)
+
+In this case we have *Two Dependent Samples*; the process is a little different.
+
+The algorithm:
+
+Given dependent samples of size $n$,
+
+1. Get the difference between the two samples and create a single sample of the differences.
+2. Draw a resample of size $n$ with replacement from the sample. Compute the statistic of interest such as the mean.
+3. Repeat this resampling process many times say 10,000.
+4. Construct the bootstrap distribution of the statistic. Inspect its spread, bias, and shape.
+
+### Example
+
+We would like to compare the mean semi-final and final sores of 12 female divers competing in the FINA World Championship in 2017.
+
+```{r}
+data("Diving2017")
+
+Ori_Final_sample = Diving2017$Final
+Ori_Semi_Final_sample = Diving2017$Semifinal
+
+ori_diff_sample = Ori_Final_sample - Ori_Semi_Final_sample
+
+n = length(ori_diff_sample)
+B = 10000
+boot_Mean_Diff = numeric(B)
+
+for (i in 1:B) {
+    samp = sample(ori_diff_sample, size = n, replace = TRUE)
+    boot_Mean_Diff[i] = mean(samp)
+}
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+Use a bootstrap CI to determine whether the mean scores for divers differ between the final and semi-final rounds.
+
+*Note: No matter what test we are supposed to use, it is always good practice to do a EDA, at least about the groups that we are interesetd in.*
+
+Interpretation of the CI (Answer to the research question):
+
+$(-6.5,31.2)$
+
+
+**As our confidence interval contains 0, **
+
+### Example
+
+Use the `FlightDelays` data frame from the resampledata package. Compute the variance of the flight delay times in May and June.
+
+```{r}
+data("FlightDelays")
+FlightDelaysMay = FlightDelays %>% filter(Month == "May")
+FlightDelaysJune = FlightDelays %>% filter(Month == "June")
+
+nm = nrow(FlightDelaysMay)
+nj = nrow(FlightDelaysJune)
+B = 10000
+boot_Mean_Diff = numeric(B)
+
+for (i in 1:B) {
+    m <- sample(FlightDelaysMay$Delay, size = nm, replace = TRUE) # Here n is the size of your bootstrap sample
+    j <- sample(FlightDelaysJune$Delay, size = nj, replace = TRUE)
+    boot_Mean_Diff[i] <- sd(j)^2 / sd(m)^2 #may - june
+}
+```
+
+Construct and interpret a 95% bootstrap percentile confidence interval for the ratio of the variances.
+
+```{r}
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+**We are 95% confident that the true ratio (June/May) of delay variances falls in the interval (0.97, 2.35).**
+
+### Example
+
+A company institutes an exercise break to see if it will improve job satisfaction. Job satisfaction scores for 10 randomly selected workers before and after the exercise program are shown in the table below. Use a bootstrap CI to check whether the job satisfaction has increased.
+
+```{r}
+library(readxl)
+worker <- read_excel("example3-3.xlsx")
+table(worker)
+
+workerBefore = worker$Before
+workerAfter = worker$After
+
+workerDiff = workerAfter - workerBefore
+
+n = length(workerDiff)
+B = 10000
+boot_Mean_Diff = numeric(B)
+
+for (i in 1:B) {
+    samp = sample(workerDiff, size = n, replace = TRUE)
+    boot_Mean_Diff[i] = mean(samp)
+}
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+$(2.5,14.8)$
+
+**We are 95% confident that the mean job satisfaction after the exercise program has increased between $2.5$ and $14.8$**
+
+### Example
+
+Use the data in `mtcars` and find the 95% confidence interval estimate of the difference between the mean gas mileage of manual and automatic transmissions.
+
+```{r}
+data("mtcars")
+
+CarsAuto = mtcars %>% filter(am == 0)
+CarsMan = mtcars %>% filter(am == 1)
+
+na = nrow(CarsAuto)
+nm = nrow(CarsMan)
+B = 10000
+boot_Mean_Diff = numeric(B)
+
+for (i in 1:B) {
+    m <- sample(CarsMan$mpg, size = nm, replace = TRUE) # Here n is the size of your bootstrap sample
+    a <- sample(CarsAuto$mpg, size = na, replace = TRUE)
+    boot_Mean_Diff[i] <- mean(m) - mean(a) #may - june
+}
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+$(3.9, 10.9)$
+
+We are 95% confident that the manual cars have higher gas milage than automatic cars by between 3.9 mpg and 10.9 mpg
+
+### Example
+
+Use the data in `mtcars` and find the 95% confidence interval estimate of the difference between the median gas mileage of manual and automatic transmissions.
+
+```{r}
+data("mtcars")
+
+CarsAuto = mtcars %>% filter(am == 0)
+CarsMan = mtcars %>% filter(am == 1)
+
+na = nrow(CarsAuto)
+nm = nrow(CarsMan)
+B = 10000
+boot_Mean_Diff = numeric(B)
+
+for (i in 1:B) {
+    m <- sample(CarsMan$mpg, size = nm, replace = TRUE) # Here n is the size of your bootstrap sample
+    a <- sample(CarsAuto$mpg, size = na, replace = TRUE)
+    boot_Mean_Diff[i] <- median(m) - median(a) #may - june
+}
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+### Example
+
+Use the data in `mtcars` and find the 95% confidence interval estimate of the difference between the mean gas mileage of cars with greater than 100hp and cars with less than 100hp.
+
+```{r}
+data("mtcars")
+
+CarsGt100hp = mtcars %>% filter(hp >= 100)
+CarsLt100hp = mtcars %>% filter(hp < 100)
+
+ng = nrow(CarsGt100hp)
+nl = nrow(CarsLt100hp)
+B = 10000
+boot_Mean_Diff = numeric(B)
+
+for (i in 1:B) {
+    g <- sample(CarsGt100hp$mpg, size = ng, replace = TRUE) # Here n is the size of your bootstrap sample
+    l <- sample(CarsLt100hp$mpg, size = nl, replace = TRUE)
+    boot_Mean_Diff[i] <- mean(g) - mean(l) #more power - less power
+}
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+### Example
+
+In the built-in data set named `immer`, the barley yield in years 1931 and 1932 of the same field are recorded. The yield data are presented in the data frame columns Y1 and Y2. Find a 95% confidence interval and check whether the barley yield has increased.
+
+```{r}
+#data("immer")
+
+#b1931 = immer$Y1
+#b1932 = immer$Y2
+
+#bDiff = b1932 - b1931
+
+#n = length(bDiff)
+#B = 10000
+#boot_Mean_Diff = numeric(B)
+
+#for (i in 1:B) {
+#    samp = sample(bDiff, size = n, replace = TRUE)
+#    boot_Mean_Diff[i] = mean(samp)
+#}
+
+#quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+### Example
+
+```{r}
+carmpg <- mtcars$mpg # This is my original SAMPLE 
+n <- length(carmpg) # This is the original sample size
+
+B <- 10000  # The number of bootstrap samples
+boot_Mean <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+
+for (i in 1:B){
+  x <- sample(carmpg, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_Mean[i] <- mean(x)
+}
+
+mean(boot_Mean) # This is the mean of the bootstrap means - so the center of the bootstrap distribution
+sd(boot_Mean) # This is the standard error of the bootstrap distribution
+
+quantile(boot_Mean, probs = c(0.025,0.975))
+```
+
+*We are 95% confident that the mean mpg for cars manufactured in 1974 is between $18.12492$ and $22.20312$*
+
+### Example
+
+```{r}
+m = median(mtcars$hp)
+CarsGt = mtcars %>% filter(hp >= m)
+CarsLt = mtcars %>% filter(hp < m)
+
+ng = nrow(CarsGt)
+nl = nrow(CarsLt)
+B = 10000
+boot_Mean_Diff = numeric(B)
+
+for (i in 1:B) {
+    g <- sample(CarsGt$mpg, size = ng, replace = TRUE) # Here n is the size of your bootstrap sample
+    l <- sample(CarsLt$mpg, size = nl, replace = TRUE)
+    boot_Mean_Diff[i] <- median(g) - median(l) #more power - less power
+}
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+### Example
+
+```{r}
+cardisp <- mtcars$disp # This is my original SAMPLE 
+n <- length(cardisp) # This is the original sample size
+
+B <- 10000  # The number of bootstrap samples
+boot_Mean <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+
+for (i in 1:B){
+  x <- sample(cardisp, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_Mean[i] <- median(x)
+}
+
+mean(boot_Mean) # This is the mean of the bootstrap means - so the center of the bootstrap distribution
+sd(boot_Mean) # This is the standard error of the bootstrap distribution
+
+quantile(boot_Mean, probs = c(0.025,0.975))
+```
+
+**We are 95% confident that the median displacement lies between 145.85 and 289.90**

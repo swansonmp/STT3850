@@ -1,0 +1,857 @@
+---
+title: "Exam 2 Notes"
+author: "Matthew Swanson"
+date: "10/31/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=5, fig.height=4, echo = TRUE)
+library(resampledata)
+data(Verizon)
+library(dplyr)
+library(knitr)
+library(moderndive)
+library(ggplot2)
+library(skimr)
+library(gapminder)
+data(gapminder2007)
+data(evals)
+gapminder2007 = gapminder %>%
+    filter(year == 2007) %>%
+    select(country, continent, lifeExp, gdpPercap)
+```
+
+
+## Verizon Case Study
+
+Let $\mu_1$ denote the mean repair time for the the ILEC customers and $\mu_2$ the mean repair time for the the CLEC customers.
+
+Form the hypothesis. $H_0: \mu_1 - \mu_2 = 0$ vs. $H_a: \mu_1 - \mu_2 < 0$
+
+Conduct the test.
+
+```{r}
+data(Verizon)
+
+library(dplyr)
+library(knitr)
+ans <- Verizon %>%
+  group_by(Group) %>%
+  summarize(mean = mean(Time), N = n())
+ans
+md = ans[2,2] - ans[1,2]
+observed = md$mean
+observed
+
+set.seed(84)
+sims <- 10^4-1 # Number of simulations (iterations)
+ans <- numeric(sims)
+for(i in 1:sims){
+  index <- sample.int(n = 1687, size = 1664, replace = FALSE) #n = total, size = num in the first group
+  ans[i] <- mean(Verizon$Time[index]) - mean(Verizon$Time[-index])
+}
+pvalue <- (sum(ans <= observed) + 1)/(sims + 1)
+pvalue
+
+library(ggplot2)
+ggplot(data = data.frame(md = ans), aes(x = md)) + 
+  geom_density(fill = "orange") + 
+  theme_bw() + 
+  labs(x = expression(bar(X)[m]-bar(X)[f])) +
+  geom_vline(xintercept=observed, linetype="dotted")
+```
+
+Step 5: Make the decision –
+
+Technical conclusion: $P$-Value < 0.05, so Reject $H_0$.
+
+English conclusion: There is enough evidence to conclude that the Verizon spend significantly more time to complete repairs for CLEC customers than for the ILEC customers.
+
+1. Create a good visual to compare the typical times to complete repairs for ILEC and CLEC customers.
+
+```{r}
+ggplot(data = Verizon, mapping = aes(x = Group, y = Time)) +
+  geom_boxplot()
+```
+
+2. Create a better visual to show the tails of the distributions.
+
+```{r}
+ggplot(data = Verizon, mapping = aes(x = Time)) +
+  geom_histogram() + facet_wrap(~Group)
+```
+
+# Summary
+
+Chapter 6:
+
+1. Simple Linear Regression
+    * 1 x-variable (numerical)
+    * 1 y-variable (always one)
+
+Example:
+
+* $x$: `bty_avg`
+* $y$: `score`
+
+On average, when you increase the `bty_avg` by one unit, the `score` will increase by `m`.
+
+# What is linear regression?
+
+In regression we try to *predict* one variable based on one or more other variables.
+
+* The variable we want to predit is called the response variable, denoted by $y$.
+* The variable(s) that we use to predict $y$ is(are) called the predictor(s) or explanatory variable(s), denoted by $x$.
+
+#  What do we cover?
+
+* In this current chapter on basic regression, we’ll always have only one explanatory variable. In *Section 2*, this explanatory variable will be a single numerical explanatory variable $x$. This scenario is known as simple linear regression.
+* In *Section 3*, this explanatory variable will be a categorical explanatory variable $x$.
+
+# One numerical explanatory variable
+
+Example 3.1:
+
+> Why do some professors and instructors at universities and colleges get high teaching evaluations from students while others don’t? What factors can explain these differences?
+
+Researchers at the University of Texas in Austin, Texas (UT Austin) tried to answer this question: what factors can explain differences in instructor’s teaching evaluation scores? To this end, they collected information on $n=463$ instructors. A full description of the study can be found at openintro.org.
+
+We’ll keep things simple for now and try to explain differences in instructor evaluation scores as a function of one numerical variable: their “'beauty score'”.
+
+* Could it be that instructors with higher beauty scores also have higher teaching evaluations?
+* Could it be instead that instructors with higher beauty scores tend to have lower teaching evaluations?
+* Or could it be there is no relationship between beauty score and teaching evaluations?
+
+We’ll address these questions by modeling the relationship between these two variables with a particular kind of linear regression called *simple linear regression*. Simple linear regression is the most basic form of linear regression. With it we have
+
+1. A numerical outcome variable $y$. In this case, their `teaching score`.
+2. A single numerical explanatory variable $x$. In this case, their `beauty score`.
+
+## Exploratory data analysis
+
+A crucial step before doing any kind of modeling or analysis is performing an exploratory data analysis, or EDA, of all our data.
+
+1. Just looking at the raw values, in a spreadsheet for example.
+2. Computing summary statistics likes means, medians, and standard deviations.
+3. Creating data visualizations.
+
+Okay… Let’s begin. The dataframe that we are working on is `evals` and it is in the `moderndive` library.
+
+### Looking at the raw values
+
+Type `library(moderndive)` in the console and hit return, then type `View(evals)` in the console and hit return. Also type `?evals` in the console to see the description of the dataframe.
+
+```{r}
+library(moderndive)
+library(dplyr)
+#View(evals) #only works in the console
+#?evals
+glimpse(evals)
+```
+
+### Computing summary statistics
+
+Since we are only interested in one $x$ variable, namely, `bty_avg`, let’s select only the $y$ variable, score and `bty_avg`.
+
+```{r}
+evals_onex <- evals %>%
+  select(score, bty_avg)
+# View(evals_onex) # Only In the console, DO NOT run the View command here
+glimpse(evals_onex)
+```
+
+Since both the outcome variable score and the explanatory variable `bty_avg` are numerical, we can compute summary statistics about them such as the mean, median, and standard deviation.
+
+Let’s pipe this into the `skim()` function from the `skimr` package. This function quickly return the following summary information about each variable.
+
+```{r}
+library(skimr)
+evals %>% 
+  select(score, bty_avg) %>% 
+  skim()
+#Or, since we have already selected the variables, skim(evals_onex) would also works
+```
+
+Here, `p0` for example the 0th percentile: the value at which 0% of observations are smaller than it. This is also known as the minimum.
+
+According to the histograms: variable score is skewed to the *left*, and the variable `bty_avg` is skewed to the *right*.
+
+We get an idea of how the values in both variables are distributed. For example, the mean teaching score was *4.17* out of 5 whereas the mean beauty score was *4.42* out of 10. Furthermore, the middle 50% of teaching scores were between *3.8* and *4.6* () while the middle 50% of beauty scores were between *3.17* and *5.5* out of 10.
+
+#### Correlation Coefficient
+
+Since we are considering the relationship between two numerical variables, it would be nice to have a summary statistic that simultaneously considers both variables. The correlation coefficient is a bivariate summary statistic that fits this bill.
+
+A correlation coefficient is a quantitative expression between -1 and 1 that summarizes the strength of the linear relationship between two numerical variables:
+
+* -1 indicates a perfect negative relationship: as the value of one variable goes up, the value of the other variable tends to go down.
+* 0 indicates no relationship: the values of both variables go up/down independently of each other.
+* +1 indicates a perfect positive relationship: as the value of one variable goes up, the value of the other variable tends to go up as well.
+
+Following figure gives examples of different correlation coefficient values for hypothetical numerical variables $x$ and $y$.
+
+We see that while for a correlation coefficient of -0.75 there is still a negative relationship between $x$ and $y$, it is not as strong as the negative relationship between $x$ and $y$ when the correlation coefficient is -1.
+
+The correlation coefficient is computed using the `get_correlation()` function in the moderndive package. Here is the syntax:
+
+```{r}
+#your_dataframe %>% 
+#  get_correlation(formula = response_variable ~ explanatory_variable)
+
+evals_onex %>% 
+  get_correlation(formula = score ~ bty_avg)
+```
+
+Another way to get the correlations is:
+
+```{r}
+cor(x = evals_onex$bty_avg, y = evals_onex$score)
+```
+
+In our case, the correlation coefficient of 0.187 indicates that the linear relationship between teaching evaluation score and beauty average is “weakly positive.”
+
+Properties of $r$
+
+1. $-1 \leq r \leq 1$
+2. r has no units
+3. Interchanging $x$ and $y$ does not change $r$
+4. Changing the units of one variable of both would not change $r$
+
+### Visualizing the Data
+
+Since both the `score` and `bty_avg` variables are numerical, a *scatter plot* is an appropriate graph to visualize this data.
+
+```{r}
+library(ggplot2)
+ggplot(data = evals_onex, mapping = aes(x = bty_avg, y = score)) + 
+    geom_point() +
+    geom_jitter() + 
+    labs(x = "Beauty Score", y = "Teaching Score", title = "Relationship Between Teaching and Beauty Scores") +
+    geom_smooth(method = "lm")
+```
+
+```{r}
+#compute summary statistics
+evals %>% 
+  select(score, age) %>% 
+  skim()
+# According to the histograms: variable score is skewed to the left, and the variable age is uniformly distributed 
+#The mean teaching score was 4.17 out of 5 whereas the mean age was 48.37
+#The median teaching score was 4.3 out of 5 whereas the median age was 48
+#Furthermore, the middle 50% of teaching scores were between 3.8 and 4.6
+# while the middle 50% of ages were between 42 and 57
+
+#get correlation
+cor(x = evals$age, y = evals$score)
+#score and age have a slight negative correlation
+#older teachers have slighty lower teaching scores than younger teachers
+
+#visualization
+ggplot(data = evals, mapping = aes(x = age, y = score)) + 
+    geom_jitter() + 
+    labs(x = "Age", y = "Teaching Score", title = "Relationship Between Teaching Scores and Age") +
+    geom_smooth(method = "lm")
+```
+
+## Simple linear regression
+
+The equation of the regression line is $\hat{y} = b_0+b_1\cdot x$ where...
+
+* the intercept coefficient is $b_0$ is the average value of $\hat{y}$ when $x=0$, and
+* the slope coefficient $b_1$ is the increase in $\hat{y}$ for every one unit increase in $x$.
+
+The vertical distances from the points to the line are called the *residuals*. We obtain the line by minimizing the sum of the squares of the distances from the points to the line. If we denote the observed points by $y_i$ and the opints on the line by $\hat{y_i}$. Then the reiduals can be denoted by $y_i-\hat{y_i}$. So we obtain the line ($b_0$ and $b_1$), by minimizing the following quantity
+
+$\texttt{Residual sum of squares} = \sum(y_i-\hat{y_i})^2$
+
+### How to use R to get $b_0$ and $b_1$ values.
+
+The `lm()` function that “fits” the linear regression model is typically used as `lm(y ~ x, data = data_frame_name)` where:
+
+* `y` is the outcome variable, followed by a tilde (`~`). In our case, `y` is set to `score`.
+* `x` is the explanatory variable. In our case, `x` is set to `bty_avg`. We call the combination `y ~ x` a model formula.
+* `data_frame_name` is the name of the data frame that contains the variables `y` and `x`. In our case, `data_frame_name` is the `evals_onex` data frame.
+
+```{r}
+score_model <- lm(score ~ bty_avg, data = evals_onex) #y ~ x
+score_model
+```
+
+This output is telling us that the Intercept coefficient $b_0$ of the regression line is 3.8803 and the slope coefficient ($b_1$) for bty_avg is 0.0666. Therefore the blue regression line is (line in the previous figure)
+
+$\hat{\text{score}} = b_0 + b_1 \cdot \text{bty_avg}$
+
+$\hat{\text{score}} = 3.8803 + 0.0666 \cdot \text{bty_avg}$
+
+Interpretations of $b_0$ and $b_1$:
+
+* The intercept coefficient $b_0=3.8803$:
+
+For instructors who with beauty score of 0, we would expect to have on average a teaching score of 3.8803. In this case interpretaion of $b_0$ is meaningless. (Why?)
+
+```{r}
+Range <- range(evals_onex$bty_avg)
+Range
+```
+
+`bty_avg` of 0 is outside the range of `bty_avg` values
+
+The intercept coefficient $b_1=+0.0666$:
+
+This is a numerical quantity that summarizes the relationship between the outcome and explanatory variables. Note that the sign is positive, suggesting a positive relationship between beauty scores and teaching scores, meaning as beauty scores go up, so also do teaching scores go up. The slope’s precise interpretation is:
+
+> For every of 1 unit increase in `bty_avg`, there is an associated increase of, on average, 0.0666 ($b_1$) units of `score`.
+
+a. Predict the teaching score if the beauty average is 7.5:
+a. Predict the teaching score if the beauty average is 9.1:
+```{r}
+score1 = 3.8803 + 0.0666 * (7.5)
+score1
+```
+
+$\hat{score} = 3.8803 + 0.0666 \times 7.5 = 4.3798$
+
+*Extrapolation* is using the regression to predict $y$ from $x$ outside the range of x values. Such predictions are often not accurate.
+``` {r}
+score2 = 3.8803 + 0.0666 * (9.1)
+score2
+```
+
+
+Fit a new simple linear regression for score where `age` is the new explanatory variable $x$.
+
+Interpret the regression coefficients.
+
+```{r}
+age_model = lm(score ~ age, data = evals)
+age_model
+```
+
+$\hat{score} = 4.461932 - 0.005938 \cdot age$ 
+
+
+## Observed, fitted values and residuals
+
+* Observed values: Usually the $y$ values from the dataset
+* Fitted values: $\hat{y}$ values we get from the model($\hat{y} = b_0+b_1\cdot x$)
+* Residuals: Difference between Observed and Fitted values = $y-\hat{y}$
+
+Let’s only consider one observation: For example, say we are interested in the 21st instructor in this dataset:
+
+```{r}
+kable(evals_onex[21,])
+```
+
+Here in this example:
+
+* Observed value = $y=4.9$
+* Fitted value = $\hat{y}=3.8803+0.0666\cdot7.333=4.368678$
+* Residual = $y-\hat{y}=4.9-4.368678=0.531322$
+
+Now, when we have to find residuals for all the values (not just one). R can do it for us…
+
+```{r}
+regression_points <- get_regression_points(score_model)
+regression_points
+```
+
+### Diagnostics (Residual Plot)
+
+The plot of residuals against the fitted values ($\hat{y}$, $y_i-\hat{y_i}$) provides infomation on the appropriateness of a *straight-line* model. Ideally, points should be scattered randomly about the reference line $y=0$ See the following Figure.
+
+Residual plots are useful for the followings:
+
+* Revealing curvature – that is, for indicating that the relationship between the two variables is not linear.
+* Spotting outliers.
+
+Example: Create a residul plot for the `score_model` and interpret the residial plot.
+
+```{r}
+ggplot(score_model, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+Plotted points are scattered randomly (no pattern) about the reference line $residual=0$. Also, no outliers are detected. Therefore the residual plot indicate that the relationship between `bty_avg` and `score` is linear.
+
+
+Example: Create a residul plot for the model where y=score and x=age and interpret the residial plot.
+```{r}
+ggplot(age_model, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+## One categorical explanatory variable
+
+When the explanatory variable $x$ is categorical, the concept of a “best-fitting” line is a little different than the one we saw in the previous Section where the explanatory variable $x$ was numerical.
+
+We use the following example to study this.
+
+It’s an unfortunate truth that life expectancy is not the same across various countries in the world; there are a multitude of factors that are associated with how long people live. International development agencies are very interested in studying these differences in the hope of understanding where governments should allocate resources to address this problem. In this section, we’ll explore differences in life expectancy in two ways:
+
+1. Differences between continents: Are there significant differences in life expectancy, on average, between the five continents of the world: Africa, the Americas, Asia, Europe, and Oceania?
+2. Differences within continents: How does life expectancy vary within the world’s five continents? For example, is the spread of life expectancy among the countries of Africa larger than the spread of life expectancy among the countries of Asia?
+
+To answer such questions, we’ll study the `gapminder` dataset in the `gapminder package`. This dataset has international development statistics such as life expectancy, GDP per capita, and population by country ($n = 142$) for 5-year intervals between 1952 and 2007.
+
+We’ll use this data for linear regression again, but note that our explanatory variable $x$ is now *categorical*, and not numerical like when we covered simple linear regression in Section 6.1. More precisely, we have:
+
+1. A numerical outcome variable $y$. In this case, life expectancy.
+2. A single categorical explanatory variable $x$, In this case, the continent the country is part of.
+
+As always, the first step in model building is…
+
+1. Type `View(gapminder)` in the console.
+
+Let’s load the `gapminder` data and `filter()` for only observations in 2007. Next we `select()` only the variables `country`, `continent`, `lifeExp`, along with `gdpPercap`, which is each country’s gross domestic product per capita (GDP). GDP is a rough measure of that country’s economic performance. Lastly, we save this in a data frame with name `gapminder2007`:
+
+```{r}
+library(gapminder)
+data(gapminder)
+str(gapminder)
+
+gapminder2007 = gapminder %>%
+    filter(year == 2007) %>%
+    select(country, continent, lifeExp, gdpPercap)
+
+glimpse(gapminder2007)
+```
+
+Notice that variable `continent` is indeed categorical.
+
+Let’s apply the `skim()` function from the `skimr` package to our two variables of interest: `continent` and `lifeExp`:
+
+```{r}
+library(skimr)
+gapminder2007 %>%
+    select(continent, lifeExp) %>%
+    skim()
+```
+
+Given that the global median life expectancy is **71.94**, half of the world’s countries (**71** countries) will have a life expectancy less than **71.94**. Further, half will have a life expectancy greater than this value. The mean life expectancy of **67.01** is lower however. Why are these two values different? Let’s look at a histogram of `lifeExp` to see why.
+
+```{r}
+ggplot(data = gapminder2007, mapping = aes(x = lifeExp)) +
+  geom_histogram(binwidth = 5, color='white', fill='orchid4')
+```
+
+We see that this data is skewed to the **left**: there are a few countries with very low life expectancy that are bringing down the **mean** life expectancy. However, the **median** is less sensitive to the effects of such outliers. Hence the **median** is greater than the **mean** in this case.
+
+```{r}
+tbl = gapminder2007 %>%
+    group_by(continent) %>%
+    summarize(median = median(lifeExp), mean = mean(lifeExp), N = n())
+kable(tbl)
+```
+
+We see now that there are differences in life expectancy between the continents. For example let’s focus on only the medians. While the median life expectancy across all $n=142$ countries in 2007 was $71.935$, the median life expectancy across the $n=place$ countries in Africa was only $place$.
+
+Let’s create a corresponding visualization.
+
+1. Compare the life expectancy of countries in different continents via a faceted histogram.
+
+``` {r}
+ggplot(data = gapminder2007, mapping = aes(x = lifeExp, fill = factor(continent))) +
+    geom_histogram(binwidth = 5, color = 'white') + 
+    labs(x = "Life Expectancy", y = "Number of Countries", title = "Life Expectancy by Continent") + 
+    facet_wrap(~ continent, nrow = 2)
+```
+
+2. Compare the life expectancy of countries in different continents via side-by-side box plots.
+
+```{r}
+ggplot(data = gapminder2007, aes(x = continent, y = lifeExp)) +
+    geom_boxplot() +
+    labs(x = "Continent", y = "Life Expectancy", title = "Life Expectancy by Continent")
+```
+
+* For example, half of all countries in Asia have a life expectancy below $72.396$ years whereas half of all countries in Asia have a life expectancy above $72.396$ years. (This is because the Median life expectancy for the countries in Asia is $72.396$).
+* Furthermore, note that: Africa and Asia have much more spread/variation in life expectancy as indicated by the *IQR* (the height of the boxes).
+* Oceania has almost no spread/variation, but this might in large part be due to the fact there are only two countries in Oceania: Australia and New Zealand.
+
+Now, let’s start making comparisons of life expectancy between continents.
+
+First we have to pick a *baseline* to compare with. Let’s use Africa.
+
+* We can see that even the country with the highest life expectancy in Africa is still lower than all countries in *Oceania*.
+* We can see that even the country with the highest life expectancy in Africa is still lower than the median life expectancy of the countries in *Europe*.
+* The median life expectancy of the Americas is roughly 20 years greater.
+* The median life expectancy of Asia is roughly 20 years greater.
+* The median life expectancy of Europe is roughly 25 years greater.
+* The median life expectancy of Oceania is roughly 27.8 years greater.
+
+### Linear regression
+
+In section 6.1 we introduced *simple linear* regression, which involves modeling the relationship between a numerical outcome variable $y$ as a function of a numerical explanatory variable $x$, in our life expectancy example, we now have a *categorical explanatory variable* $x$ continent.
+
+While we still can fit a regression model, given our categorical explanatory variable we no longer have a concept of a *“best-fitting”* line, but rather *“differences relative to a baseline for comparison.”*
+
+Before we fit our regression model, let’s create a table similar to the previous table, but...
+
+1. Report the mean life expectancy for each continent.
+2. Report the difference in mean life expectancy relative to Africa’s mean life expectancy of $54.806$ in the column “mean vs Africa”; this column is simply the “mean” column minus $54.806$.
+
+```{r}
+meanAfrica = 54.806
+tbl = gapminder2007 %>%
+    group_by(continent) %>%
+    summarize(mean = round(mean(lifeExp),3), vsAfrica = round(mean(lifeExp),3)-meanAfrica)
+kable(tbl)
+```
+
+Now, let’s use the `lm` function we introduced in Section 6.1 to get the regression coefficients for `gapminder2007` analysis:
+
+```{r}
+lifeExp_model <- lm(lifeExp ~ continent, data = gapminder2007)
+lifeExp_model
+
+summary(lifeExp_model)
+```
+
+What are these values? First, we must describe the equation for fitted value $\hat{y}$, which is a little more complicated when the $x$ explanatory variable is categorical:
+
+$\hat{\text{life exp}} = b_0 + b_{Amer} \cdot 1_{Amer}(x) + b_{Asia} \cdot 1_{Asia}(x) + b_{Euro} \cdot 1_{Euro}(x) + b_{Ocean} \cdot 1_{Ocean}(x)$
+
+$\hat{\text{life exp}} = 54.81 + 18.80 \cdot 1_{Amer}(x) + 15.92 \cdot 1_{Asia}(x) +  22.84 \cdot 1_{Euro}(x) + 25.91 \cdot 1_{Ocean}(x)$
+
+What does $1_{A}(x)$ mean? (from your previous math course)
+
+In mathematics this is known as an “indicator function” that takes one of two possible values:
+
+$1_{A}(x) = \begin{cases} 1 & x \in A \\ 0 & x \notin A \end{cases}$
+
+In a statistical modeling context this is also known as a “dummy variable”. In our case, let’s consider the first such indicator variable:
+
+$1_{Amer}(x) = \begin{cases} 1 &  \text{if country x is in the Americas} \\ 0 & \text{otherwise} \end{cases}$
+
+Now let’s interpret the regression coefficients.
+
+1. First $b_0 = intercept = 54.8$: the mean life expectancy for countries in Africa, because Africa was our baseline.
+2. $b_{Amer} = continentAmericas = 18.8$: the difference in mean life expectancy of countries in the Americas relative to Africa, or in other words, on average countries in the Americas had life expectancy 18.8 years greater.
+
+The fitted value yielded by this equation is: (i.e. in this case, only the indicator function $1_{Amer}(x)$ is equal to 1, but all others are 0.
+
+$\hat{\text{life exp}} = 54.81 + 18.80 \cdot 1_{Amer}(x) + 15.92 \cdot 1_{Asia}(x) +  22.84 \cdot 1_{Euro}(x) + 25.91 \cdot 1_{Ocean}(x)$
+
+$\hat{\text{life exp}} = 54.81 + 18.80 \cdot 1 + 15.92 \cdot 0 +  22.84 \cdot 0 + 25.91 \cdot 0$
+
+$\hat{\text{life exp}} = 54.81 + 18.80$
+
+$\hat{\text{life exp}} = 72.9$
+
+Furthermore, this value corresponds to the group mean life expectancy for all American countries.
+
+* Similarly, $b_{Asia} = continentAsia = 15.9$. Interpret this: the difference in mean life expectancy of countries in Asia relative to Africa had life expectancy $15.9$ years greater
+* $b_{Euro} = continentEurope = 22.84$: the difference in mean life expectancy of countries in Europe relative to Africa had life expectancy $22.84$ years greater
+* $b_{Ocean} = continentOceania = 25.91$: the difference in mean life expectancy of countries in Oceania relative to Africa had life expectancy $25.91$ years greater
+
+Rest of the coefficients can be interpreted the same way.
+
+Let’s generalize...
+
+* If we fit a linear regression model using a categorical explanatory variable $x$ that has $k$ levels, a regression model will return an intercept and $k−1$ “slope” coefficients.
+* When $x$ is a numerical explanatory variable the interpretation is of a “slope” coefficient
+* When $x$ is categorical the meaning is a little trickier. They are “offsets” relative to the baseline.
+
+# Introduction
+
+We’ll use the `Credit` dataframe from the `ISLR` package to demonstrate multiple regression with:
+
+1. A numerical outcome variable $y$, in this case credit card balance.
+2. Two explanatory variables:
+    * A first numerical explanatory variable $x_1$. In this case, their credit limit.
+    * A second numerical explanatory variable $x_2$. In this case, their income (in thousands of dollars).
+
+# Exploratory data analysis
+
+* Load the `Credit` data
+* Use the `View` command to look at raw data.
+* Now `select()` only `Balance`, `Limit`, `Income`, `Rating` and `Age` variables. (We will be using `Rating` and `Age` in a forthcoming exercise)
+
+```{r}
+library(ISLR)
+data(Credit)
+#View(Credit)
+glimpse(Credit)
+credit = Credit %>% select(Balance, Limit, Income, Rating, Age)
+glimpse(credit)
+```
+
+Let’s look at some summary statistics for the variables that we need for the problem at hand.
+
+```{r}
+library(skimr)
+library(ggplot2)
+library(cowplot)
+
+credit %>% skim()
+
+pAge = ggplot(data = credit, mapping = aes(x = Age)) +
+  geom_histogram(binwidth = 10, fill = 'red2', color = 'red4')
+
+pBalance = ggplot(data = credit, mapping = aes(x = Balance)) +
+  geom_histogram(binwidth = 200, fill = 'blue2', color = 'blue4')
+
+pLimit = ggplot(data = credit, mapping = aes(x = Limit)) +
+  geom_histogram(binwidth = 1000, fill = 'yellow2', color = 'yellow4')
+
+pRating = ggplot(data = credit, mapping = aes(x = Rating)) +
+  geom_histogram(binwidth = 100, fill = 'green2', color = 'green4')
+
+plot_grid(pAge, pBalance, pLimit, pRating)
+```
+
+Let’s also look at *histograms* as visual aids.
+
+We observe for example:
+
+* *The average credit card balance is $459.50.*
+* *25% of card holders had debts of $68.75 or less.*
+* *The average credit card limit is $4622.50.*
+* *75% of these card holders had incomes of $57,470 or less.*
+* 50% of card holders have debts over $459.50
+* The average age of card holders is 56 years old
+* 
+
+
+Since our outcome variable `Balance` and the explanatory variables `Limit` and `Income` are numerical, we can and have to compute the *correlation coefficient* between pairs of these variables before we proceed to build a model.
+
+```{r}
+credit %>%
+  select(Balance, Limit, Income) %>% 
+  cor()
+```
+
+* `Balance` with `Limit` is $0.862$. This indicates a strong positive linear relationship, which makes sense as only individuals with large credit limits can accrue large credit card balances.
+* `Balance` with `Income` is $0.464$. This is suggestive of another positive linear relationship, although not as strong as the relationship between Balance and Limit.
+* As an added bonus, we can read off the correlation coefficient of the two explanatory variables, `Limit` and `Income` of $0.792$. In this case, we say there is a high degree of collinearity between these two explanatory variables.
+
+> Note: Collinearity (or multicollinearity) is a phenomenon in which one explanatory variable in a multiple regression model can be linearly predicted from the others with a substantial degree of accuracy. So in this case, if we knew someone’s credit card Limit and since Limit and Income are highly correlated, we could make a fairly accurate guess as to that person’s Income. Or put loosely, these two variables provided redundant information. For now let’s ignore any issues related to collinearity and press on.
+
+Let’s visualize the relationship of the outcome variable with each of the two explanatory variables in two separate plots:
+
+To get a sense of the joint relationship of all three variables simultaneously through a visualization, let’s display the data in a 3-dimensional (3D) scatterplot, where
+
+1. The numerical outcome variable $y$ `Balance` is on the $z$-axis (vertical axis)
+2. The two numerical explanatory variables form the “floor” axes. In this case
+    * The first numerical explanatory variable $x_1$, `Income` is on of the floor axes.
+    * The second numerical explanatory variable $x_2$, `Limit` is on the other floor axis.
+
+```{r}
+library(plotly)
+p <- plot_ly(data = Credit, z = ~Balance, x = ~Income, y = ~Limit, opacity = 0.6, color = Credit$Balance) %>%
+  add_markers() 
+p
+```
+
+### Exercise
+
+Conduct a new exploratory data analysis with the same outcome variable $y$ being `Balance` but with `Rating` and `Age` as the new explanatory variables $x_1$ and $x_2$. Remember, this involves three things:
+
+1. Looking at the raw values
+2. Computing summary statistics of the variables of interest.
+    * *Half of cardholders are over the age of 56.*
+    * *25% of cardholders have a credit rating of under 247.25*
+    * *Only a quarter of cardholders are under 42 years old*
+    * *25% of cardholders are over 70 years old*
+    * *25% of cardholders have a credit rating over 437.25*
+    * *The youngest credit card holder is 23 years old*
+    * *The oldest credit card holder is 98 years old*
+    * *The lowest credit card rating is 93*
+    * *The highest credit card rating is 982*
+3. Creating informative visualizations
+
+What can you say about the relationship between a credit card holder’s balance and their credit rating and age?
+
+```{r}
+credit %>%
+  select(Balance, Rating, Age) %>% 
+  cor()
+```
+
+Balance with Limit is 0.862. This indicates a strong positive linear relationship, which makes sense as only individuals with large credit limits can accrue large credit card balances.
+Balance with Income is 0.464. This is suggestive of another positive linear relationship, although not as strong as the relationship between Balance and Limit.
+As an added bonus, we can read off the correlation coefficient of the two explanatory variables, Limit and Income of 0.792. In this case, we say there is a high degree of collinearity between these two explanatory variables.
+
+## Multiple regression
+
+We now use a `+` to consider multiple explanatory variables. Here is the syntax:
+
+    model_name <- lm(y ~ x1 + x2 + ... +xn, data = data_frame_name)
+
+```{r}
+Balance_model <- lm(Balance ~ Limit + Income, data = Credit)
+Balance_model
+
+# Or use one of the followings to see more info...
+library(moderndive)
+get_regression_table(Balance_model)
+
+#summary(Balance_model)
+```
+
+> Model: $\hat{Balance}= -385 +  0.264 \cdot Limit - 7.66 \cdot Income$
+
+How do we interpret these three values that define the regression plane?
+
+* `Intercept`: $-\$385.18$ (rounded to two decimal points to represent cents). The intercept in our case represents the credit card balance for an individual who has both a credit `Limit` of $\$0$ and `Income` of $\$0$.
+    * In our data however, the intercept has limited (or no) practical interpretation as ….
+* `Limit`: $\$0.26$. Now that we have multiple variables to consider, we have to add a caveat to our interpretation: Holding all the other variables fixed (`Income`, in this case), for every increase of one unit in credit `Limit` (dollars), there is an associated increase of on average $\$0.26$ in credit card balance.
+* `Income`: $-\$7.66$. Similarly, Holding all the other variables fixed (`Limit`, in this case), for every increase of one unit in `Income` (in other words, $\$10000$ in income), there is an associated decrease of on average $\$7.66$ in credit card balance.
+
+## Observed/fitted values and residuals
+
+As we did previously, let’s look at the fitted values and residuals.
+
+```{r}
+regression_points <- get_regression_points(Balance_model)
+regression_points
+```
+
+### Diagnostics (Residual plot)
+
+```{r}
+ggplot(Balance_model, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+### Making predictions
+
+Assuming the model is good...
+
+Kevin has a credit limit of $5080 and his income is $150,000. Use the Balance_model to predict Kevin’s balance.
+
+    newx <- data.frame(Limit = _____, Income = ____)
+
+    predicted_balance <- predict(Balance_model, newx)
+    predicted_balance
+
+``` {r}
+newx = data.frame(Limit = c(5080,4090), Income = c(15,30))
+predicted_balance = predict(Balance_model, newx)
+predicted_balance
+```
+
+## One numerical & one categorical explanatory variable
+
+Let’s revisit the instructor evaluation data introduced in Ch 6.
+
+Consider a modeling scenario with:
+
+1. A numerical outcome variable $y$. As before, instructor evaluation score.
+2. Two explanatory variables:
+    a. A numerical explanatory variable $x_1$: in this case, their `age`.
+    b. A categorical explanatory variable $x_2$: in this case, their binary `gender`.
+    
+### Exploratory data analysis
+
+Let’s reload the `evals` data and `select()` only the needed subset of variables. Note that these are different than the variables chosen in Chapter 6. Let’s given this the name `evals_ch7`.
+
+1. Let’s look at the raw data values both by using View() and the glimpse() functions.
+2. Let’s look at some summary statistics using the skim() function from the `skimr` package:
+
+```{r}
+library(moderndive)
+data(evals)
+
+evals_ch7 = evals %>% select(age, gender, score)
+
+glimpse(evals_ch7)
+
+evals_ch7 %>% skim()
+```
+
+3. Let’s compute the correlation between two numerical variables we have `score` and `age`. Recall that correlation coefficients only exist between *numerical* variables.
+
+```{r}
+evals_ch7 %>% 
+  get_correlation(formula = score ~ age)
+```
+
+We observe that the `age` and the `score` are *weakly* and *negatively* correlated.
+
+Now, let’s try to visualize the correlation.
+
+* Create a scatterplot of `score` over `age`. Use the binary `gender` variable to color the point with two colors. Add a regression line (or two) in to your scatterplot.
+    * Say a couple of interesting things about the graph you’ve created.
+
+```{r}
+ggplot(data = evals_ch7, mapping = aes(x = age, y = score, color = gender)) + 
+    geom_point(alpha = 0.5) +
+    labs(x = "Age", y = "Teaching Score", title = "Using method = lm") +
+    geom_smooth(method = "lm", se = FALSE)
+```
+
+* Females experience a more severe decline in teaching score with age
+* Many of the poor teaching scores for men come from men over 55, while many of the poor teaching scores for women come from women between 35 and 55
+
+### Multiple regression: Parallel slopes model
+
+Much like we started to consider multiple explanatory variables using the `+` sign in the previous section, let’s fit a regression model and get the regression table.
+
+```{r}
+score_model_ch7 = lm(score ~ age + gender, data = evals_ch7)
+score_model_ch7
+
+#get_regression_table(score_model_ch7)
+```
+
+Full: $\hat{Score} = 4.48 - 0.009 \cdot age + 0.191 \cdot 1_{Male}(x)$
+
+Male: $\hat{Score_M} = 4.671 - 0.009 \cdot age$
+
+Female: $\hat{Score_F} = 4.48 - 0.009 \cdot age$
+
+Let’s create the scatterplot of `score` over `age` again. Use the binary `gender` variable to color the point with two colors. Add a regression lines in to your scatterplot but use the model(s) we created.
+
+``` {r}
+ggplot(data = evals_ch7, mapping = aes(x = age, y = score, color = gender)) + 
+    geom_point(alpha = 0.5) +
+    labs(x = "Age", y = "Teaching Score", title = "Using Parallel Slopes") +
+    geom_abline(intercept = 4.48, slope = -0.009, color = "tomato", lwd=1) +
+    geom_abline(intercept = 4.671, slope = -0.009, color = "mediumturquoise", lwd=1)
+```
+
+Interpretaions of the coefficients:
+
+* $b_{male}=0.1906$ is the average difference in teaching score that men get relative to the baseline of women.
+* Accordingly, the intercepts (which in this case make no sense since no instructor can have an age of 0) are :
+    * for women: $b_0=4.484$
+    * for men: $b_0+b_{male}=4.484+0.191=4.675$ 
+* Both men and women have the same slope. In other words, in this model the associated effect of age is the same for men and women. So for every increase of one year in age, there is on average an associated decrease of $b_{age}=−0.009$ in teaching score.
+
+### Multiple Regression: Interaction Model
+
+We say a model has an interaction effect if the associated effect of one variable depends on the value of another variable. These types of models usually prove to be tricky to view on first glance because of their complexity. In this case, the effect of age will depend on the value of gender. (as was suggested by the different slopes for men and women in our visual exploratory data analysis)
+
+Let’s fit a regression with an interaction term. We add an interaction term using the `*` sign. Let’s fit this regression and save it in `score_model_interaction`, then we get the regression table using the `get_regression_table()` function as before.
+
+```{r}
+score_model_interaction <- lm(score ~ age + gender + age * gender, data = evals_ch7)
+get_regression_table(score_model_interaction)
+```
+
+The modeling equation for this scenario is (Writing the equation):
+
+> $\hat{y} = b_0 + b_1 \cdot x_1 + b_2 \cdot x_2 + b_3 \cdot x_1 \cdot x_2$
+
+> $\hat{score} = 4.883 - 0.018 \cdot age - 0.446 \cdot 1_{Male}(x) + 0.014   \cdot age \cdot 1_{Male}(x)$
+
+The model for male:
+
+> $\hat{score} = 4.883 - 0.018 \cdot age - 0.446 \cdot 1 + 0.014 \cdot age \cdot 1$
+
+> $\hat{score} = 4.437 - 0.004 \cdot age$
+
+The model for female:
+
+> $\hat{score} = 4.883 - 0.018 \cdot age - 0.446 \cdot 0 + 0.014 \cdot age \cdot 0$
+
+> $\hat{score} = 4.883 - 0.018 \cdot age$
+
+We see that while male instructors have a lower intercept, as they age, they have a less steep associated average decrease in teaching scores: 0.004 teaching score units per year as opposed to -0.018 for women. This is consistent with the different slopes and intercepts of the red and blue regression lines fit in the original scatter plot.
+
+``` {r}
+ggplot(data = evals_ch7, mapping = aes(x = age, y = score, color = gender)) + 
+    geom_point(alpha = 0.5) +
+    labs(x = "Age", y = "Teaching Score", title = "Using Parallel Slopes") +
+    geom_abline(intercept = 4.883, slope = -0.018, color = "tomato", lwd=1) +
+    geom_abline(intercept = 4.437, slope = -0.004, color = "mediumturquoise", lwd=1)
+```

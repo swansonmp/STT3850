@@ -1,0 +1,31 @@
+---
+title: "Quiz 9 - 2"
+author: "Matthew Swanson"
+date: "11/21/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ISLR)
+data(Credit)
+
+cLimit = Credit$Limit # This is my original SAMPLE 
+n = length(cLimit) # This is the original sample size
+B <- 10000  # The number of bootstrap samples
+boot_Mean <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+set.seed(888)
+for (i in 1:B){
+  x <- sample(cLimit, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_Mean[i] <- mean(x)
+}
+
+mean(boot_Mean) # This is the mean of the bootstrap means - so the center of the bootstrap distribution
+sd(boot_Mean) # This is the standard error of the bootstrap distribution
+
+quantile(boot_Mean, probs = c(0.025,0.975))
+```
+

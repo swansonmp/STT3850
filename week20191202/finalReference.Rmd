@@ -1,0 +1,1875 @@
+---
+title: "Final Exam Reference"
+author: "Matthew Swanson"
+date: "12/4/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=5, fig.height=4, echo = TRUE)
+library(resampledata)
+data("FishMercury")
+data("Beerwings")
+data("Girls2004")
+data("IceCream")
+data(Verizon)
+library(dplyr)
+library(knitr)
+library(moderndive)
+library(ggplot2)
+library(skimr)
+library(gapminder)
+data(gapminder2007)
+data(evals)
+gapminder2007 = gapminder %>%
+    filter(year == 2007) %>%
+    select(country, continent, lifeExp, gdpPercap)
+```
+
+
+## Verizon Case Study
+
+Let $\mu_1$ denote the mean repair time for the the ILEC customers and $\mu_2$ the mean repair time for the the CLEC customers.
+
+Form the hypothesis. $H_0: \mu_1 - \mu_2 = 0$ vs. $H_a: \mu_1 - \mu_2 < 0$
+
+Conduct the test.
+
+```{r}
+data(Verizon)
+
+library(dplyr)
+library(knitr)
+ans <- Verizon %>%
+  group_by(Group) %>%
+  summarize(mean = mean(Time), N = n())
+ans
+md = ans[2,2] - ans[1,2]
+observed = md$mean
+observed
+
+set.seed(84)
+sims <- 10^4-1 # Number of simulations (iterations)
+ans <- numeric(sims)
+for(i in 1:sims){
+  index <- sample.int(n = 1687, size = 1664, replace = FALSE) #n = total, size = num in the first group
+  ans[i] <- mean(Verizon$Time[index]) - mean(Verizon$Time[-index])
+}
+pvalue <- (sum(ans <= observed) + 1)/(sims + 1)
+pvalue
+
+library(ggplot2)
+ggplot(data = data.frame(md = ans), aes(x = md)) + 
+  geom_density(fill = "orange") + 
+  theme_bw() + 
+  labs(x = expression(bar(X)[m]-bar(X)[f])) +
+  geom_vline(xintercept=observed, linetype="dotted")
+```
+
+Step 5: Make the decision –
+
+Technical conclusion: $P$-Value < 0.05, so Reject $H_0$.
+
+English conclusion: There is enough evidence to conclude that the Verizon spend significantly more time to complete repairs for CLEC customers than for the ILEC customers.
+
+1. Create a good visual to compare the typical times to complete repairs for ILEC and CLEC customers.
+
+```{r}
+ggplot(data = Verizon, mapping = aes(x = Group, y = Time)) +
+  geom_boxplot()
+```
+
+2. Create a better visual to show the tails of the distributions.
+
+```{r}
+ggplot(data = Verizon, mapping = aes(x = Time)) +
+  geom_histogram() + facet_wrap(~Group)
+```
+
+# Summary
+
+Chapter 6:
+
+1. Simple Linear Regression
+    * 1 x-variable (numerical)
+    * 1 y-variable (always one)
+
+Example:
+
+* $x$: `bty_avg`
+* $y$: `score`
+
+On average, when you increase the `bty_avg` by one unit, the `score` will increase by `m`.
+
+# What is linear regression?
+
+In regression we try to *predict* one variable based on one or more other variables.
+
+* The variable we want to predit is called the response variable, denoted by $y$.
+* The variable(s) that we use to predict $y$ is(are) called the predictor(s) or explanatory variable(s), denoted by $x$.
+
+#  What do we cover?
+
+* In this current chapter on basic regression, we’ll always have only one explanatory variable. In *Section 2*, this explanatory variable will be a single numerical explanatory variable $x$. This scenario is known as simple linear regression.
+* In *Section 3*, this explanatory variable will be a categorical explanatory variable $x$.
+
+# One numerical explanatory variable
+
+Example 3.1:
+
+> Why do some professors and instructors at universities and colleges get high teaching evaluations from students while others don’t? What factors can explain these differences?
+
+Researchers at the University of Texas in Austin, Texas (UT Austin) tried to answer this question: what factors can explain differences in instructor’s teaching evaluation scores? To this end, they collected information on $n=463$ instructors. A full description of the study can be found at openintro.org.
+
+We’ll keep things simple for now and try to explain differences in instructor evaluation scores as a function of one numerical variable: their “'beauty score'”.
+
+* Could it be that instructors with higher beauty scores also have higher teaching evaluations?
+* Could it be instead that instructors with higher beauty scores tend to have lower teaching evaluations?
+* Or could it be there is no relationship between beauty score and teaching evaluations?
+
+We’ll address these questions by modeling the relationship between these two variables with a particular kind of linear regression called *simple linear regression*. Simple linear regression is the most basic form of linear regression. With it we have
+
+1. A numerical outcome variable $y$. In this case, their `teaching score`.
+2. A single numerical explanatory variable $x$. In this case, their `beauty score`.
+
+## Exploratory data analysis
+
+A crucial step before doing any kind of modeling or analysis is performing an exploratory data analysis, or EDA, of all our data.
+
+1. Just looking at the raw values, in a spreadsheet for example.
+2. Computing summary statistics likes means, medians, and standard deviations.
+3. Creating data visualizations.
+
+Okay… Let’s begin. The dataframe that we are working on is `evals` and it is in the `moderndive` library.
+
+### Looking at the raw values
+
+Type `library(moderndive)` in the console and hit return, then type `View(evals)` in the console and hit return. Also type `?evals` in the console to see the description of the dataframe.
+
+```{r}
+library(moderndive)
+library(dplyr)
+#View(evals) #only works in the console
+#?evals
+glimpse(evals)
+```
+
+### Computing summary statistics
+
+Since we are only interested in one $x$ variable, namely, `bty_avg`, let’s select only the $y$ variable, score and `bty_avg`.
+
+```{r}
+evals_onex <- evals %>%
+  select(score, bty_avg)
+# View(evals_onex) # Only In the console, DO NOT run the View command here
+glimpse(evals_onex)
+```
+
+Since both the outcome variable score and the explanatory variable `bty_avg` are numerical, we can compute summary statistics about them such as the mean, median, and standard deviation.
+
+Let’s pipe this into the `skim()` function from the `skimr` package. This function quickly return the following summary information about each variable.
+
+```{r}
+library(skimr)
+evals %>% 
+  select(score, bty_avg) %>% 
+  skim()
+#Or, since we have already selected the variables, skim(evals_onex) would also works
+```
+
+Here, `p0` for example the 0th percentile: the value at which 0% of observations are smaller than it. This is also known as the minimum.
+
+According to the histograms: variable score is skewed to the *left*, and the variable `bty_avg` is skewed to the *right*.
+
+We get an idea of how the values in both variables are distributed. For example, the mean teaching score was *4.17* out of 5 whereas the mean beauty score was *4.42* out of 10. Furthermore, the middle 50% of teaching scores were between *3.8* and *4.6* () while the middle 50% of beauty scores were between *3.17* and *5.5* out of 10.
+
+#### Correlation Coefficient
+
+Since we are considering the relationship between two numerical variables, it would be nice to have a summary statistic that simultaneously considers both variables. The correlation coefficient is a bivariate summary statistic that fits this bill.
+
+A correlation coefficient is a quantitative expression between -1 and 1 that summarizes the strength of the linear relationship between two numerical variables:
+
+* -1 indicates a perfect negative relationship: as the value of one variable goes up, the value of the other variable tends to go down.
+* 0 indicates no relationship: the values of both variables go up/down independently of each other.
+* +1 indicates a perfect positive relationship: as the value of one variable goes up, the value of the other variable tends to go up as well.
+
+Following figure gives examples of different correlation coefficient values for hypothetical numerical variables $x$ and $y$.
+
+We see that while for a correlation coefficient of -0.75 there is still a negative relationship between $x$ and $y$, it is not as strong as the negative relationship between $x$ and $y$ when the correlation coefficient is -1.
+
+The correlation coefficient is computed using the `get_correlation()` function in the moderndive package. Here is the syntax:
+
+```{r}
+#your_dataframe %>% 
+#  get_correlation(formula = response_variable ~ explanatory_variable)
+
+evals_onex %>% 
+  get_correlation(formula = score ~ bty_avg)
+```
+
+Another way to get the correlations is:
+
+```{r}
+cor(x = evals_onex$bty_avg, y = evals_onex$score)
+```
+
+In our case, the correlation coefficient of 0.187 indicates that the linear relationship between teaching evaluation score and beauty average is “weakly positive.”
+
+Properties of $r$
+
+1. $-1 \leq r \leq 1$
+2. r has no units
+3. Interchanging $x$ and $y$ does not change $r$
+4. Changing the units of one variable of both would not change $r$
+
+### Visualizing the Data
+
+Since both the `score` and `bty_avg` variables are numerical, a *scatter plot* is an appropriate graph to visualize this data.
+
+```{r}
+library(ggplot2)
+ggplot(data = evals_onex, mapping = aes(x = bty_avg, y = score)) + 
+    geom_point() +
+    geom_jitter() + 
+    labs(x = "Beauty Score", y = "Teaching Score", title = "Relationship Between Teaching and Beauty Scores") +
+    geom_smooth(method = "lm")
+```
+
+```{r}
+#compute summary statistics
+evals %>% 
+  select(score, age) %>% 
+  skim()
+# According to the histograms: variable score is skewed to the left, and the variable age is uniformly distributed 
+#The mean teaching score was 4.17 out of 5 whereas the mean age was 48.37
+#The median teaching score was 4.3 out of 5 whereas the median age was 48
+#Furthermore, the middle 50% of teaching scores were between 3.8 and 4.6
+# while the middle 50% of ages were between 42 and 57
+
+#get correlation
+cor(x = evals$age, y = evals$score)
+#score and age have a slight negative correlation
+#older teachers have slighty lower teaching scores than younger teachers
+
+#visualization
+ggplot(data = evals, mapping = aes(x = age, y = score)) + 
+    geom_jitter() + 
+    labs(x = "Age", y = "Teaching Score", title = "Relationship Between Teaching Scores and Age") +
+    geom_smooth(method = "lm")
+```
+
+## Simple linear regression
+
+The equation of the regression line is $\hat{y} = b_0+b_1\cdot x$ where...
+
+* the intercept coefficient is $b_0$ is the average value of $\hat{y}$ when $x=0$, and
+* the slope coefficient $b_1$ is the increase in $\hat{y}$ for every one unit increase in $x$.
+
+The vertical distances from the points to the line are called the *residuals*. We obtain the line by minimizing the sum of the squares of the distances from the points to the line. If we denote the observed points by $y_i$ and the opints on the line by $\hat{y_i}$. Then the reiduals can be denoted by $y_i-\hat{y_i}$. So we obtain the line ($b_0$ and $b_1$), by minimizing the following quantity
+
+$\texttt{Residual sum of squares} = \sum(y_i-\hat{y_i})^2$
+
+### How to use R to get $b_0$ and $b_1$ values.
+
+The `lm()` function that “fits” the linear regression model is typically used as `lm(y ~ x, data = data_frame_name)` where:
+
+* `y` is the outcome variable, followed by a tilde (`~`). In our case, `y` is set to `score`.
+* `x` is the explanatory variable. In our case, `x` is set to `bty_avg`. We call the combination `y ~ x` a model formula.
+* `data_frame_name` is the name of the data frame that contains the variables `y` and `x`. In our case, `data_frame_name` is the `evals_onex` data frame.
+
+```{r}
+score_model <- lm(score ~ bty_avg, data = evals_onex) #y ~ x
+score_model
+```
+
+This output is telling us that the Intercept coefficient $b_0$ of the regression line is 3.8803 and the slope coefficient ($b_1$) for bty_avg is 0.0666. Therefore the blue regression line is (line in the previous figure)
+
+$\hat{\text{score}} = b_0 + b_1 \cdot \text{bty_avg}$
+
+$\hat{\text{score}} = 3.8803 + 0.0666 \cdot \text{bty_avg}$
+
+Interpretations of $b_0$ and $b_1$:
+
+* The intercept coefficient $b_0=3.8803$:
+
+For instructors who with beauty score of 0, we would expect to have on average a teaching score of 3.8803. In this case interpretaion of $b_0$ is meaningless. (Why?)
+
+```{r}
+Range <- range(evals_onex$bty_avg)
+Range
+```
+
+`bty_avg` of 0 is outside the range of `bty_avg` values
+
+The intercept coefficient $b_1=+0.0666$:
+
+This is a numerical quantity that summarizes the relationship between the outcome and explanatory variables. Note that the sign is positive, suggesting a positive relationship between beauty scores and teaching scores, meaning as beauty scores go up, so also do teaching scores go up. The slope’s precise interpretation is:
+
+> For every of 1 unit increase in `bty_avg`, there is an associated increase of, on average, 0.0666 ($b_1$) units of `score`.
+
+a. Predict the teaching score if the beauty average is 7.5:
+a. Predict the teaching score if the beauty average is 9.1:
+```{r}
+score1 = 3.8803 + 0.0666 * (7.5)
+score1
+```
+
+$\hat{score} = 3.8803 + 0.0666 \times 7.5 = 4.3798$
+
+*Extrapolation* is using the regression to predict $y$ from $x$ outside the range of x values. Such predictions are often not accurate.
+``` {r}
+score2 = 3.8803 + 0.0666 * (9.1)
+score2
+```
+
+
+Fit a new simple linear regression for score where `age` is the new explanatory variable $x$.
+
+Interpret the regression coefficients.
+
+```{r}
+age_model = lm(score ~ age, data = evals)
+age_model
+```
+
+$\hat{score} = 4.461932 - 0.005938 \cdot age$ 
+
+
+## Observed, fitted values and residuals
+
+* Observed values: Usually the $y$ values from the dataset
+* Fitted values: $\hat{y}$ values we get from the model($\hat{y} = b_0+b_1\cdot x$)
+* Residuals: Difference between Observed and Fitted values = $y-\hat{y}$
+
+Let’s only consider one observation: For example, say we are interested in the 21st instructor in this dataset:
+
+```{r}
+kable(evals_onex[21,])
+```
+
+Here in this example:
+
+* Observed value = $y=4.9$
+* Fitted value = $\hat{y}=3.8803+0.0666\cdot7.333=4.368678$
+* Residual = $y-\hat{y}=4.9-4.368678=0.531322$
+
+Now, when we have to find residuals for all the values (not just one). R can do it for us…
+
+```{r}
+regression_points <- get_regression_points(score_model)
+regression_points
+```
+
+### Diagnostics (Residual Plot)
+
+The plot of residuals against the fitted values ($\hat{y}$, $y_i-\hat{y_i}$) provides infomation on the appropriateness of a *straight-line* model. Ideally, points should be scattered randomly about the reference line $y=0$ See the following Figure.
+
+Residual plots are useful for the followings:
+
+* Revealing curvature – that is, for indicating that the relationship between the two variables is not linear.
+* Spotting outliers.
+
+Example: Create a residul plot for the `score_model` and interpret the residial plot.
+
+```{r}
+ggplot(score_model, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+Plotted points are scattered randomly (no pattern) about the reference line $residual=0$. Also, no outliers are detected. Therefore the residual plot indicate that the relationship between `bty_avg` and `score` is linear.
+
+
+Example: Create a residul plot for the model where y=score and x=age and interpret the residial plot.
+```{r}
+ggplot(age_model, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+## One categorical explanatory variable
+
+When the explanatory variable $x$ is categorical, the concept of a “best-fitting” line is a little different than the one we saw in the previous Section where the explanatory variable $x$ was numerical.
+
+We use the following example to study this.
+
+It’s an unfortunate truth that life expectancy is not the same across various countries in the world; there are a multitude of factors that are associated with how long people live. International development agencies are very interested in studying these differences in the hope of understanding where governments should allocate resources to address this problem. In this section, we’ll explore differences in life expectancy in two ways:
+
+1. Differences between continents: Are there significant differences in life expectancy, on average, between the five continents of the world: Africa, the Americas, Asia, Europe, and Oceania?
+2. Differences within continents: How does life expectancy vary within the world’s five continents? For example, is the spread of life expectancy among the countries of Africa larger than the spread of life expectancy among the countries of Asia?
+
+To answer such questions, we’ll study the `gapminder` dataset in the `gapminder package`. This dataset has international development statistics such as life expectancy, GDP per capita, and population by country ($n = 142$) for 5-year intervals between 1952 and 2007.
+
+We’ll use this data for linear regression again, but note that our explanatory variable $x$ is now *categorical*, and not numerical like when we covered simple linear regression in Section 6.1. More precisely, we have:
+
+1. A numerical outcome variable $y$. In this case, life expectancy.
+2. A single categorical explanatory variable $x$, In this case, the continent the country is part of.
+
+As always, the first step in model building is…
+
+1. Type `View(gapminder)` in the console.
+
+Let’s load the `gapminder` data and `filter()` for only observations in 2007. Next we `select()` only the variables `country`, `continent`, `lifeExp`, along with `gdpPercap`, which is each country’s gross domestic product per capita (GDP). GDP is a rough measure of that country’s economic performance. Lastly, we save this in a data frame with name `gapminder2007`:
+
+```{r}
+library(gapminder)
+data(gapminder)
+str(gapminder)
+
+gapminder2007 = gapminder %>%
+    filter(year == 2007) %>%
+    select(country, continent, lifeExp, gdpPercap)
+
+glimpse(gapminder2007)
+```
+
+Notice that variable `continent` is indeed categorical.
+
+Let’s apply the `skim()` function from the `skimr` package to our two variables of interest: `continent` and `lifeExp`:
+
+```{r}
+library(skimr)
+gapminder2007 %>%
+    select(continent, lifeExp) %>%
+    skim()
+```
+
+Given that the global median life expectancy is **71.94**, half of the world’s countries (**71** countries) will have a life expectancy less than **71.94**. Further, half will have a life expectancy greater than this value. The mean life expectancy of **67.01** is lower however. Why are these two values different? Let’s look at a histogram of `lifeExp` to see why.
+
+```{r}
+ggplot(data = gapminder2007, mapping = aes(x = lifeExp)) +
+  geom_histogram(binwidth = 5, color='white', fill='orchid4')
+```
+
+We see that this data is skewed to the **left**: there are a few countries with very low life expectancy that are bringing down the **mean** life expectancy. However, the **median** is less sensitive to the effects of such outliers. Hence the **median** is greater than the **mean** in this case.
+
+```{r}
+tbl = gapminder2007 %>%
+    group_by(continent) %>%
+    summarize(median = median(lifeExp), mean = mean(lifeExp), N = n())
+kable(tbl)
+```
+
+We see now that there are differences in life expectancy between the continents. For example let’s focus on only the medians. While the median life expectancy across all $n=142$ countries in 2007 was $71.935$, the median life expectancy across the $n=place$ countries in Africa was only $place$.
+
+Let’s create a corresponding visualization.
+
+1. Compare the life expectancy of countries in different continents via a faceted histogram.
+
+``` {r}
+ggplot(data = gapminder2007, mapping = aes(x = lifeExp, fill = factor(continent))) +
+    geom_histogram(binwidth = 5, color = 'white') + 
+    labs(x = "Life Expectancy", y = "Number of Countries", title = "Life Expectancy by Continent") + 
+    facet_wrap(~ continent, nrow = 2)
+```
+
+2. Compare the life expectancy of countries in different continents via side-by-side box plots.
+
+```{r}
+ggplot(data = gapminder2007, aes(x = continent, y = lifeExp)) +
+    geom_boxplot() +
+    labs(x = "Continent", y = "Life Expectancy", title = "Life Expectancy by Continent")
+```
+
+* For example, half of all countries in Asia have a life expectancy below $72.396$ years whereas half of all countries in Asia have a life expectancy above $72.396$ years. (This is because the Median life expectancy for the countries in Asia is $72.396$).
+* Furthermore, note that: Africa and Asia have much more spread/variation in life expectancy as indicated by the *IQR* (the height of the boxes).
+* Oceania has almost no spread/variation, but this might in large part be due to the fact there are only two countries in Oceania: Australia and New Zealand.
+
+Now, let’s start making comparisons of life expectancy between continents.
+
+First we have to pick a *baseline* to compare with. Let’s use Africa.
+
+* We can see that even the country with the highest life expectancy in Africa is still lower than all countries in *Oceania*.
+* We can see that even the country with the highest life expectancy in Africa is still lower than the median life expectancy of the countries in *Europe*.
+* The median life expectancy of the Americas is roughly 20 years greater.
+* The median life expectancy of Asia is roughly 20 years greater.
+* The median life expectancy of Europe is roughly 25 years greater.
+* The median life expectancy of Oceania is roughly 27.8 years greater.
+
+### Linear regression
+
+In section 6.1 we introduced *simple linear* regression, which involves modeling the relationship between a numerical outcome variable $y$ as a function of a numerical explanatory variable $x$, in our life expectancy example, we now have a *categorical explanatory variable* $x$ continent.
+
+While we still can fit a regression model, given our categorical explanatory variable we no longer have a concept of a *“best-fitting”* line, but rather *“differences relative to a baseline for comparison.”*
+
+Before we fit our regression model, let’s create a table similar to the previous table, but...
+
+1. Report the mean life expectancy for each continent.
+2. Report the difference in mean life expectancy relative to Africa’s mean life expectancy of $54.806$ in the column “mean vs Africa”; this column is simply the “mean” column minus $54.806$.
+
+```{r}
+meanAfrica = 54.806
+tbl = gapminder2007 %>%
+    group_by(continent) %>%
+    summarize(mean = round(mean(lifeExp),3), vsAfrica = round(mean(lifeExp),3)-meanAfrica)
+kable(tbl)
+```
+
+Now, let’s use the `lm` function we introduced in Section 6.1 to get the regression coefficients for `gapminder2007` analysis:
+
+```{r}
+lifeExp_model <- lm(lifeExp ~ continent, data = gapminder2007)
+lifeExp_model
+
+summary(lifeExp_model)
+```
+
+What are these values? First, we must describe the equation for fitted value $\hat{y}$, which is a little more complicated when the $x$ explanatory variable is categorical:
+
+$\hat{\text{life exp}} = b_0 + b_{Amer} \cdot 1_{Amer}(x) + b_{Asia} \cdot 1_{Asia}(x) + b_{Euro} \cdot 1_{Euro}(x) + b_{Ocean} \cdot 1_{Ocean}(x)$
+
+$\hat{\text{life exp}} = 54.81 + 18.80 \cdot 1_{Amer}(x) + 15.92 \cdot 1_{Asia}(x) +  22.84 \cdot 1_{Euro}(x) + 25.91 \cdot 1_{Ocean}(x)$
+
+What does $1_{A}(x)$ mean? (from your previous math course)
+
+In mathematics this is known as an “indicator function” that takes one of two possible values:
+
+$1_{A}(x) = \begin{cases} 1 & x \in A \\ 0 & x \notin A \end{cases}$
+
+In a statistical modeling context this is also known as a “dummy variable”. In our case, let’s consider the first such indicator variable:
+
+$1_{Amer}(x) = \begin{cases} 1 &  \text{if country x is in the Americas} \\ 0 & \text{otherwise} \end{cases}$
+
+Now let’s interpret the regression coefficients.
+
+1. First $b_0 = intercept = 54.8$: the mean life expectancy for countries in Africa, because Africa was our baseline.
+2. $b_{Amer} = continentAmericas = 18.8$: the difference in mean life expectancy of countries in the Americas relative to Africa, or in other words, on average countries in the Americas had life expectancy 18.8 years greater.
+
+The fitted value yielded by this equation is: (i.e. in this case, only the indicator function $1_{Amer}(x)$ is equal to 1, but all others are 0.
+
+$\hat{\text{life exp}} = 54.81 + 18.80 \cdot 1_{Amer}(x) + 15.92 \cdot 1_{Asia}(x) +  22.84 \cdot 1_{Euro}(x) + 25.91 \cdot 1_{Ocean}(x)$
+
+$\hat{\text{life exp}} = 54.81 + 18.80 \cdot 1 + 15.92 \cdot 0 +  22.84 \cdot 0 + 25.91 \cdot 0$
+
+$\hat{\text{life exp}} = 54.81 + 18.80$
+
+$\hat{\text{life exp}} = 72.9$
+
+Furthermore, this value corresponds to the group mean life expectancy for all American countries.
+
+* Similarly, $b_{Asia} = continentAsia = 15.9$. Interpret this: the difference in mean life expectancy of countries in Asia relative to Africa had life expectancy $15.9$ years greater
+* $b_{Euro} = continentEurope = 22.84$: the difference in mean life expectancy of countries in Europe relative to Africa had life expectancy $22.84$ years greater
+* $b_{Ocean} = continentOceania = 25.91$: the difference in mean life expectancy of countries in Oceania relative to Africa had life expectancy $25.91$ years greater
+
+Rest of the coefficients can be interpreted the same way.
+
+Let’s generalize...
+
+* If we fit a linear regression model using a categorical explanatory variable $x$ that has $k$ levels, a regression model will return an intercept and $k−1$ “slope” coefficients.
+* When $x$ is a numerical explanatory variable the interpretation is of a “slope” coefficient
+* When $x$ is categorical the meaning is a little trickier. They are “offsets” relative to the baseline.
+
+# Introduction
+
+We’ll use the `Credit` dataframe from the `ISLR` package to demonstrate multiple regression with:
+
+1. A numerical outcome variable $y$, in this case credit card balance.
+2. Two explanatory variables:
+    * A first numerical explanatory variable $x_1$. In this case, their credit limit.
+    * A second numerical explanatory variable $x_2$. In this case, their income (in thousands of dollars).
+
+# Exploratory data analysis
+
+* Load the `Credit` data
+* Use the `View` command to look at raw data.
+* Now `select()` only `Balance`, `Limit`, `Income`, `Rating` and `Age` variables. (We will be using `Rating` and `Age` in a forthcoming exercise)
+
+```{r}
+library(ISLR)
+data(Credit)
+#View(Credit)
+glimpse(Credit)
+credit = Credit %>% select(Balance, Limit, Income, Rating, Age)
+glimpse(credit)
+```
+
+Let’s look at some summary statistics for the variables that we need for the problem at hand.
+
+```{r}
+library(skimr)
+library(ggplot2)
+library(cowplot)
+
+credit %>% skim()
+
+pAge = ggplot(data = credit, mapping = aes(x = Age)) +
+  geom_histogram(binwidth = 10, fill = 'red2', color = 'red4')
+
+pBalance = ggplot(data = credit, mapping = aes(x = Balance)) +
+  geom_histogram(binwidth = 200, fill = 'blue2', color = 'blue4')
+
+pLimit = ggplot(data = credit, mapping = aes(x = Limit)) +
+  geom_histogram(binwidth = 1000, fill = 'yellow2', color = 'yellow4')
+
+pRating = ggplot(data = credit, mapping = aes(x = Rating)) +
+  geom_histogram(binwidth = 100, fill = 'green2', color = 'green4')
+
+plot_grid(pAge, pBalance, pLimit, pRating)
+```
+
+Let’s also look at *histograms* as visual aids.
+
+We observe for example:
+
+* *The average credit card balance is $459.50.*
+* *25% of card holders had debts of $68.75 or less.*
+* *The average credit card limit is $4622.50.*
+* *75% of these card holders had incomes of $57,470 or less.*
+* 50% of card holders have debts over $459.50
+* The average age of card holders is 56 years old
+* 
+
+
+Since our outcome variable `Balance` and the explanatory variables `Limit` and `Income` are numerical, we can and have to compute the *correlation coefficient* between pairs of these variables before we proceed to build a model.
+
+```{r}
+credit %>%
+  select(Balance, Limit, Income) %>% 
+  cor()
+```
+
+* `Balance` with `Limit` is $0.862$. This indicates a strong positive linear relationship, which makes sense as only individuals with large credit limits can accrue large credit card balances.
+* `Balance` with `Income` is $0.464$. This is suggestive of another positive linear relationship, although not as strong as the relationship between Balance and Limit.
+* As an added bonus, we can read off the correlation coefficient of the two explanatory variables, `Limit` and `Income` of $0.792$. In this case, we say there is a high degree of collinearity between these two explanatory variables.
+
+> Note: Collinearity (or multicollinearity) is a phenomenon in which one explanatory variable in a multiple regression model can be linearly predicted from the others with a substantial degree of accuracy. So in this case, if we knew someone’s credit card Limit and since Limit and Income are highly correlated, we could make a fairly accurate guess as to that person’s Income. Or put loosely, these two variables provided redundant information. For now let’s ignore any issues related to collinearity and press on.
+
+Let’s visualize the relationship of the outcome variable with each of the two explanatory variables in two separate plots:
+
+To get a sense of the joint relationship of all three variables simultaneously through a visualization, let’s display the data in a 3-dimensional (3D) scatterplot, where
+
+1. The numerical outcome variable $y$ `Balance` is on the $z$-axis (vertical axis)
+2. The two numerical explanatory variables form the “floor” axes. In this case
+    * The first numerical explanatory variable $x_1$, `Income` is on of the floor axes.
+    * The second numerical explanatory variable $x_2$, `Limit` is on the other floor axis.
+
+```{r}
+library(plotly)
+p <- plot_ly(data = Credit, z = ~Balance, x = ~Income, y = ~Limit, opacity = 0.6, color = Credit$Balance) %>%
+  add_markers() 
+p
+```
+
+### Exercise
+
+Conduct a new exploratory data analysis with the same outcome variable $y$ being `Balance` but with `Rating` and `Age` as the new explanatory variables $x_1$ and $x_2$. Remember, this involves three things:
+
+1. Looking at the raw values
+2. Computing summary statistics of the variables of interest.
+    * *Half of cardholders are over the age of 56.*
+    * *25% of cardholders have a credit rating of under 247.25*
+    * *Only a quarter of cardholders are under 42 years old*
+    * *25% of cardholders are over 70 years old*
+    * *25% of cardholders have a credit rating over 437.25*
+    * *The youngest credit card holder is 23 years old*
+    * *The oldest credit card holder is 98 years old*
+    * *The lowest credit card rating is 93*
+    * *The highest credit card rating is 982*
+3. Creating informative visualizations
+
+What can you say about the relationship between a credit card holder’s balance and their credit rating and age?
+
+```{r}
+credit %>%
+  select(Balance, Rating, Age) %>% 
+  cor()
+```
+
+Balance with Limit is 0.862. This indicates a strong positive linear relationship, which makes sense as only individuals with large credit limits can accrue large credit card balances.
+Balance with Income is 0.464. This is suggestive of another positive linear relationship, although not as strong as the relationship between Balance and Limit.
+As an added bonus, we can read off the correlation coefficient of the two explanatory variables, Limit and Income of 0.792. In this case, we say there is a high degree of collinearity between these two explanatory variables.
+
+## Multiple regression
+
+We now use a `+` to consider multiple explanatory variables. Here is the syntax:
+
+    model_name <- lm(y ~ x1 + x2 + ... +xn, data = data_frame_name)
+
+```{r}
+Balance_model <- lm(Balance ~ Limit + Income, data = Credit)
+Balance_model
+
+# Or use one of the followings to see more info...
+library(moderndive)
+get_regression_table(Balance_model)
+
+#summary(Balance_model)
+```
+
+> Model: $\hat{Balance}= -385 +  0.264 \cdot Limit - 7.66 \cdot Income$
+
+How do we interpret these three values that define the regression plane?
+
+* `Intercept`: $-\$385.18$ (rounded to two decimal points to represent cents). The intercept in our case represents the credit card balance for an individual who has both a credit `Limit` of $\$0$ and `Income` of $\$0$.
+    * In our data however, the intercept has limited (or no) practical interpretation as ….
+* `Limit`: $\$0.26$. Now that we have multiple variables to consider, we have to add a caveat to our interpretation: Holding all the other variables fixed (`Income`, in this case), for every increase of one unit in credit `Limit` (dollars), there is an associated increase of on average $\$0.26$ in credit card balance.
+* `Income`: $-\$7.66$. Similarly, Holding all the other variables fixed (`Limit`, in this case), for every increase of one unit in `Income` (in other words, $\$10000$ in income), there is an associated decrease of on average $\$7.66$ in credit card balance.
+
+## Observed/fitted values and residuals
+
+As we did previously, let’s look at the fitted values and residuals.
+
+```{r}
+regression_points <- get_regression_points(Balance_model)
+regression_points
+```
+
+### Diagnostics (Residual plot)
+
+```{r}
+ggplot(Balance_model, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+### Making predictions
+
+Assuming the model is good...
+
+Kevin has a credit limit of $5080 and his income is $150,000. Use the Balance_model to predict Kevin’s balance.
+
+    newx <- data.frame(Limit = _____, Income = ____)
+
+    predicted_balance <- predict(Balance_model, newx)
+    predicted_balance
+
+``` {r}
+newx = data.frame(Limit = c(5080,4090), Income = c(15,30))
+predicted_balance = predict(Balance_model, newx)
+predicted_balance
+```
+
+## One numerical & one categorical explanatory variable
+
+Let’s revisit the instructor evaluation data introduced in Ch 6.
+
+Consider a modeling scenario with:
+
+1. A numerical outcome variable $y$. As before, instructor evaluation score.
+2. Two explanatory variables:
+    a. A numerical explanatory variable $x_1$: in this case, their `age`.
+    b. A categorical explanatory variable $x_2$: in this case, their binary `gender`.
+    
+### Exploratory data analysis
+
+Let’s reload the `evals` data and `select()` only the needed subset of variables. Note that these are different than the variables chosen in Chapter 6. Let’s given this the name `evals_ch7`.
+
+1. Let’s look at the raw data values both by using View() and the glimpse() functions.
+2. Let’s look at some summary statistics using the skim() function from the `skimr` package:
+
+```{r}
+library(moderndive)
+data(evals)
+
+evals_ch7 = evals %>% select(age, gender, score)
+
+glimpse(evals_ch7)
+
+evals_ch7 %>% skim()
+```
+
+3. Let’s compute the correlation between two numerical variables we have `score` and `age`. Recall that correlation coefficients only exist between *numerical* variables.
+
+```{r}
+evals_ch7 %>% 
+  get_correlation(formula = score ~ age)
+```
+
+We observe that the `age` and the `score` are *weakly* and *negatively* correlated.
+
+Now, let’s try to visualize the correlation.
+
+* Create a scatterplot of `score` over `age`. Use the binary `gender` variable to color the point with two colors. Add a regression line (or two) in to your scatterplot.
+    * Say a couple of interesting things about the graph you’ve created.
+
+```{r}
+ggplot(data = evals_ch7, mapping = aes(x = age, y = score, color = gender)) + 
+    geom_point(alpha = 0.5) +
+    labs(x = "Age", y = "Teaching Score", title = "Using method = lm") +
+    geom_smooth(method = "lm", se = FALSE)
+```
+
+* Females experience a more severe decline in teaching score with age
+* Many of the poor teaching scores for men come from men over 55, while many of the poor teaching scores for women come from women between 35 and 55
+
+### Multiple regression: Parallel slopes model
+
+Much like we started to consider multiple explanatory variables using the `+` sign in the previous section, let’s fit a regression model and get the regression table.
+
+```{r}
+score_model_ch7 = lm(score ~ age + gender, data = evals_ch7)
+score_model_ch7
+
+#get_regression_table(score_model_ch7)
+```
+
+Full: $\hat{Score} = 4.48 - 0.009 \cdot age + 0.191 \cdot 1_{Male}(x)$
+
+Male: $\hat{Score_M} = 4.671 - 0.009 \cdot age$
+
+Female: $\hat{Score_F} = 4.48 - 0.009 \cdot age$
+
+Let’s create the scatterplot of `score` over `age` again. Use the binary `gender` variable to color the point with two colors. Add a regression lines in to your scatterplot but use the model(s) we created.
+
+``` {r}
+ggplot(data = evals_ch7, mapping = aes(x = age, y = score, color = gender)) + 
+    geom_point(alpha = 0.5) +
+    labs(x = "Age", y = "Teaching Score", title = "Using Parallel Slopes") +
+    geom_abline(intercept = 4.48, slope = -0.009, color = "tomato", lwd=1) +
+    geom_abline(intercept = 4.671, slope = -0.009, color = "mediumturquoise", lwd=1)
+```
+
+Interpretaions of the coefficients:
+
+* $b_{male}=0.1906$ is the average difference in teaching score that men get relative to the baseline of women.
+* Accordingly, the intercepts (which in this case make no sense since no instructor can have an age of 0) are :
+    * for women: $b_0=4.484$
+    * for men: $b_0+b_{male}=4.484+0.191=4.675$ 
+* Both men and women have the same slope. In other words, in this model the associated effect of age is the same for men and women. So for every increase of one year in age, there is on average an associated decrease of $b_{age}=−0.009$ in teaching score.
+
+### Multiple Regression: Interaction Model
+
+We say a model has an interaction effect if the associated effect of one variable depends on the value of another variable. These types of models usually prove to be tricky to view on first glance because of their complexity. In this case, the effect of age will depend on the value of gender. (as was suggested by the different slopes for men and women in our visual exploratory data analysis)
+
+Let’s fit a regression with an interaction term. We add an interaction term using the `*` sign. Let’s fit this regression and save it in `score_model_interaction`, then we get the regression table using the `get_regression_table()` function as before.
+
+```{r}
+score_model_interaction <- lm(score ~ age + gender + age * gender, data = evals_ch7)
+get_regression_table(score_model_interaction)
+```
+
+The modeling equation for this scenario is (Writing the equation):
+
+> $\hat{y} = b_0 + b_1 \cdot x_1 + b_2 \cdot x_2 + b_3 \cdot x_1 \cdot x_2$
+
+> $\hat{score} = 4.883 - 0.018 \cdot age - 0.446 \cdot 1_{Male}(x) + 0.014   \cdot age \cdot 1_{Male}(x)$
+
+The model for male:
+
+> $\hat{score} = 4.883 - 0.018 \cdot age - 0.446 \cdot 1 + 0.014 \cdot age \cdot 1$
+
+> $\hat{score} = 4.437 - 0.004 \cdot age$
+
+The model for female:
+
+> $\hat{score} = 4.883 - 0.018 \cdot age - 0.446 \cdot 0 + 0.014 \cdot age \cdot 0$
+
+> $\hat{score} = 4.883 - 0.018 \cdot age$
+
+We see that while male instructors have a lower intercept, as they age, they have a less steep associated average decrease in teaching scores: 0.004 teaching score units per year as opposed to -0.018 for women. This is consistent with the different slopes and intercepts of the red and blue regression lines fit in the original scatter plot.
+
+``` {r}
+ggplot(data = evals_ch7, mapping = aes(x = age, y = score, color = gender)) + 
+    geom_point(alpha = 0.5) +
+    labs(x = "Age", y = "Teaching Score", title = "Using Parallel Slopes") +
+    geom_abline(intercept = 4.883, slope = -0.018, color = "tomato", lwd=1) +
+    geom_abline(intercept = 4.437, slope = -0.004, color = "mediumturquoise", lwd=1)
+```
+
+***
+
+# Sampling Distribution of the sample proportion
+
+## Color proportion of balls in a bowl
+
+A bowl has a certain number of red and a certain number of white balls all of equal size. Furthermore, it appears the bowl has been mixed beforehand as there does not seem to be any particular pattern to the spatial distribution of red and white balls.
+
+> What proportion of this bowl’s balls are red?
+
+One way to answer this question would be to perform an exhaustive count: remove each ball individually, count the number of red balls and the number of white balls, and divide the number of red balls by the total number of balls. However, this would be a long and tedious process.
+
+Observe that **17** of the balls are red and there are a total of **50** balls and thus **34%** of the shovel’s balls are red. We can view the proportion of balls that are red in this shovel as a guess of the proportion of balls that are red in the entire bowl. While not as exact as doing an exhaustive count, our guess of **34%** took much less time and energy to obtain.
+
+However, say, we started this activity over from the beginning. In other words, we replace the 50 balls back into the bowl and start over. Would we remove exactly 17 red balls again? In other words, would our guess at the proportion of the bowl’s balls that are red be exactly 34% again? Maybe?
+
+What if we repeated this exercise several times? Would I obtain exactly 17 red balls each time? In other words, would our guess at the proportion of the bowl’s balls that are red be exactly 34% every time? Surely not.
+
+### Simulation
+
+```{r}
+library(moderndive)
+data(bowl)
+head(bowl)
+```
+
+Observe in the output that bowl has **2400** rows, telling us that the bowl contains **2400** equally-sized balls. The first variable `ball_ID` is used merely as an *identification variable*, none of the balls in the actual bowl are marked with numbers. The second variable `color` indicates whether a particular virtual ball is red or white.
+
+Now that we have a virtual analogue of our bowl, we now need a virtual analogue for the shovel seen in Figure 2; we’ll use this virtual shovel to generate our virtual random samples of 50 balls. We’re going to use the `rep_sample_n()` function included in the `moderndive` package. This function allows us to take repeated, or replicated, samples of size $n$. Run the following and explore.
+
+```{r}
+virtual_shovel <- bowl %>% 
+  rep_sample_n(size = 50)
+
+virtual_shovel
+```
+
+Next we can find out how many red ones are there in our `virtual_shovel`
+
+```{r}
+virtual_shovel %>% 
+  summarize(num_red = sum(color=="red")) 
+```
+
+How about the proportion on red? We can use the `mutate` (new) function to create a new variable, in this case `prop_red`.
+
+```{r}
+virtual_shovel %>% 
+  summarize(num_red = sum(color == "red")) %>% 
+  mutate(prop_red = num_red / 50)
+```
+
+## Using the virtual shovel multiple times
+
+```{r}
+virtual_samples <- bowl %>% 
+  rep_sample_n(size = 50, reps = 30)
+
+#kable(virtual_samples)
+```
+
+Observe that while the first 50 rows of replicate are equal to 1, the next 50 rows of replicate are equal to 2. This is telling us that the first 50 rows correspond to the first sample of 50 balls while the next 50 correspond to the second sample of 50 balls. This pattern continues for all `reps = 30` replicates and thus `virtual_samples` has $30×50=1500$ rows.
+
+```{r}
+virtual_prop_red <- virtual_samples %>% 
+  group_by(replicate) %>% 
+  summarize(red = sum(color == "red")) %>% 
+  mutate(prop_red = red / 50)
+
+virtual_prop_red
+```
+
+Let’s visualize the distribution of these 33 proportions red based on 33 virtual samples using a histogram with `binwidth = 0.05`
+
+```{r}
+ggplot(virtual_prop_red, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.05, boundary = 0.4, color = "white", fill = "steelblue") +
+  labs(x = "Proportion of 50 balls that were red", 
+       title = "Distribution of 30 proportions red") 
+```
+
+Observe that occasionally we obtained proportions red that are less than ____, while on the other hand we occasionally we obtained proportions that are greater than ____. However, the most frequently occurring proportions red out of 50 balls were between ____ % and ____ % (for ___ out 30 samples). Why do we have these differences in proportions red? Because of ___________________.
+
+### Exercise
+
+Redo the above activity with 1000 repeated samples and state your conclusions.
+
+```{r}
+virtual_samples <- bowl %>% 
+  rep_sample_n(size = 50, reps = 1000)
+
+virtual_prop_red <- virtual_samples %>% 
+  group_by(replicate) %>% 
+  summarize(red = sum(color == "red")) %>% 
+  mutate(prop_red = red / 50)
+
+ggplot(virtual_prop_red, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.05, boundary = 0.4, color = "white", fill = "steelblue") +
+  labs(x = "Proportion of 50 balls that were red", 
+       title = "Distribution of 1000 proportions red") 
+```
+
+### Using different shovels
+
+``` {r}
+# Segment 1: sample size = 25 ------------------------------
+# 1.a) Virtually use shovel 1000 times
+virtual_samples_25 <- bowl %>% 
+  rep_sample_n(size = 25, reps = 1000)
+
+# 1.b) Compute resulting 1000 replicates of proportion red
+virtual_prop_red_25 <- virtual_samples_25 %>% 
+  group_by(replicate) %>% 
+  summarize(red = sum(color == "red")) %>% 
+  mutate(prop_red = red / 25)
+
+# 1.c) Plot distribution via a histogram
+p1 <- ggplot(virtual_prop_red_25, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.05, boundary = 0.4, color = "white") +
+  labs(x = "Pro of 25 balls that were red", title = "25") 
+
+# Segment 2: sample size = 50 ------------------------------
+# 2.a) Virtually use shovel 1000 times
+virtual_samples_50 <- bowl %>% 
+  rep_sample_n(size = 50, reps = 1000)
+
+# 2.b) Compute resulting 1000 replicates of proportion red
+virtual_prop_red_50 <- virtual_samples_50 %>% 
+  group_by(replicate) %>% 
+  summarize(red = sum(color == "red")) %>% 
+  mutate(prop_red = red / 50)
+
+# 2.c) Plot distribution via a histogram
+p2 <- ggplot(virtual_prop_red_50, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.05, boundary = 0.4, color = "white") +
+  labs(x = "Pro of 50 balls that were red", title = "50")  
+
+# Segment 3: sample size = 100 ------------------------------
+# 3.a) Virtually using shovel with 100 slots 1000 times
+virtual_samples_100 <- bowl %>% 
+  rep_sample_n(size = 100, reps = 1000)
+
+# 3.b) Compute resulting 1000 replicates of proportion red
+virtual_prop_red_100 <- virtual_samples_100 %>% 
+  group_by(replicate) %>% 
+  summarize(red = sum(color == "red")) %>% 
+  mutate(prop_red = red / 100)
+
+# 3.c) Plot distribution via a histogram
+p3 <- ggplot(virtual_prop_red_100, aes(x = prop_red)) +
+  geom_histogram(binwidth = 0.05, boundary = 0.4, color = "white") +
+  labs(x = "Pro of 100 balls that were red", title = "100") 
+
+
+plot_grid(p1, p2, p3, nrow = 1)
+```
+
+Observe that as the sample size increases, the ______ of the 1000 replicates of the proportion red decreases. In other words, as the sample size increases, there are less differences due to sampling variation and the distribution centers more tightly around the same value. Eyeballing the above Figure, things appear to center tightly around roughly ____%.
+
+```{r}
+# n = 25
+virtual_prop_red_25 %>% 
+  summarize(sd = sd(prop_red))
+# n = 50
+virtual_prop_red_50 %>% 
+  summarize(sd = sd(prop_red))
+# n = 100
+virtual_prop_red_100 %>% 
+  summarize(sd = sd(prop_red))
+
+```
+
+As the sample size increases, our numerical measure of spread decreases; there is less variation in our proportions red. In other words, as the sample size increases, our guesses at the true proportion of the bowl’s balls that are red get more consistent and precise.
+
+## Summary
+
+This was our first attempt at understanding two key concepts relating to sampling for estimation:
+
+* The effect of sampling variation on our estimates.
+* The effect of sample size on sampling variation.
+
+## Terminology/Notation
+
+1. **(Study) Population**: A (study) population is a collection of individuals or observations about which we are interested. We mathematically denote the population’s size using upper case N. In our simulations the (study) population was the collection of N = 2400 identically sized red and white balls contained in the bowl.
+2. **Population parameter**: A population parameter is a numerical summary quantity about the population that is unknown, but you wish you knew. For example, when this quantity is a mean, the population parameter of interest is the population mean which is denoted with $\mu$. In our simulations; however, since we were interested in the proportion of the bowl’s balls that were red, the population parameter is the population proportion which is denoted with the letter $p$.
+3. **Census**: An exhaustive enumeration or counting of all $N$ individuals or observations in the population in order to compute the population parameter’s value exactly. In our simulations, this would correspond to manually going over all $N=2400$ balls in the bowl and counting the number that are red and computing the population proportion $p$ of the balls that are red exactly. When the number $N$ of individuals or observations in our population is large, as was the case with our bowl, a census can be very expensive in terms of time, energy, and money.
+4. **Sampling**: Sampling is the act of collecting a sample from the population when we don’t have the means to perform a census. We mathematically denote the sample’s size using lower case $n$, as opposed to upper case $N$ which denotes the population’s size. Typically the sample size $n$ is much smaller than the population size $N$, thereby making sampling a much cheaper procedure than a census. In our simulations, we used shovels with $25, 50,$ and $100$ slots to extract a sample of size $n=25, n=50,$ and $n=100$ balls.
+5. **Point estimate** *(AKA sample statistic)*: A summary statistic computed from the sample that estimates the unknown population parameter. In our simulations, recall that the unknown population parameter was the population proportion and that this is mathematically denoted with $p$. Our point estimate is the sample proportion: the proportion of the shovel’s balls that are red. In other words, it is our guess of the proportion of the bowl’s balls balls that are red. We mathematically denote the sample proportion using $\hat{p}$; the “hat” on top of the p indicates that it is an estimate of the unknown population proportion $p$.
+6. **Representative sampling**: A sample is said be a representative sample if it is representative of the population. In other words, are the sample’s characteristics a good representation of the population’s characteristics? In our simulations, are the samples of $n$ balls extracted using our shovels representative of the bowl’s $N=2400$ balls?
+7. **Generalizability**: We say a sample is generalizable if any results based on the sample can generalize to the population. In other words, can the value of the point estimate be generalized to estimate the value of the population parameter well? In our simulations, can we generalize the values of the sample proportions red of our shovels to the population proportion red of the bowl? Using mathematical notation, is $\hat{p}$ a “good guess” of $p$?
+8. **Bias**: In a statistical sense, we say bias occurs if certain individuals or observations in a population have a higher chance of being included in a sample than others. We say a sampling procedure is unbiased if every observation in a population had an equal chance of being sampled. In our simulations, since each ball had the same size and hence an equal chance of being sample in our shovels, our samples were unbiased.
+9. **Random sampling**: We say a sampling procedure is random if we sample randomly from the population in an unbiased fashion. In our simulations, this would correspond to sufficiently mixing the bowl before each use of the shovel.
+
+Putting it all together...
+
+* If we extract a sample of $n=50$ balls at random, in other words we mix the equally-sized balls before using the shovel, then...
+* the contents of the shovel are an *unbiased representation* of the contents of the bowl’s 2400 balls, thus...
+* any result based on the sample of balls can *generalize* to the bowl, thus...
+* the sample proportion $\hat{p}$ of the $n=50$ balls in the shovel that are red is a “good guess” of the population proportion $p$ of the $N=2400$ balls that are red, thus...
+* instead of manually going over all the balls in the bowl, we can *infer* about the bowl using the shovel.
+
+> Definition 1.1: The sampling distribution of a Statistic (e.g. Mean, Median, Proportion, etc) is its probability distribution.
+
+> Definition 1.2: The standard deviation of a sampling distribution is called the standard error.
+
+## Exercise
+
+Find and plot the sampling distribution of the proportion ($\hat{p}$) of heads when you flip a fair coin. (Use 5000 sets of 10 tosses)
+
+1. What is the sample size?
+2. How many experiments?
+3. Find and plot the sampling distribution of $\hat{p}$.
+4. Find the average of $\hat{p}$.
+5. Find the standard error of the sampling distribution of $\hat{p}$.
+6. What happens to the standard error, when you increase the sample size?
+
+```{r}
+coin = c("Heads", "Tails")
+coin = tbl_df(coin)
+coin
+
+vs = coin %>% rep_sample_n(size = 10, reps = 5000, replace = TRUE)
+
+vp = vs %>% 
+  group_by(replicate) %>% 
+  summarize(Heads = sum(value == "Heads")) %>% 
+  mutate(pHeads = Heads / 10)
+
+ggplot(vp, aes(x = pHeads)) +
+  geom_histogram(binwidth = 0.1, color = "white", fill = "brown") +
+  labs(x = "Proportion of 10 flipped heads", 
+       title = "Distribution of 5000 proportions heads") 
+
+mean(vp$pHeads)
+sd(vp$pHeads)
+```
+
+## Brand Name Distributions
+
+### Normal Distribution
+
+The normal distribution is defined by the following probability density function, where $\mu$ is the population mean and $\sigma$ is the standard deviation.
+
+$f(x) = \dfrac{1}{\sigma \sqrt{2 \pi}}e^{-(x-\mu)^2/{2\sigma^2}}$
+
+If a random variable $X$ follows the normal distribution, then we write: $X \sim N(\mu, \sigma^2)$
+
+Here is how the normal density looks like: Ex: here $X \sim N(0, 1)$
+
+```{r echo=FALSE}
+p1 <- ggplot(data = data.frame(x = c(-3, 3)), aes(x)) +
+  stat_function(fun = dnorm, n = 101, args = list(mean = 0, sd = 1)) + ylab("") +
+  scale_y_continuous(breaks = NULL)
+p1
+```
+
+#### R functions for Normal Distribution: 
+
+*Package: stats*
+
+1. Generate a random sample of 100 from $N(15, 9)$ and create a histogram.
+
+```{r}
+x <- rnorm(n = 100, mean = 15, sd = 3)
+ggplot(data.frame(x), aes(x = x)) + geom_histogram(binwidth = 1.5) 
+```
+
+2. If $X \sim N(15, 9)$ find the probability that X being greater than 21: $P(X>21)$
+
+```{r}
+ggplot(data.frame(x), aes(x = x)) + geom_histogram(binwidth = 1.5) + geom_vline(xintercept = 21)
+pnorm(21, mean = 15, sd = 3) # pnorm gives us the left tail area to a given number, 21 in this case
+```
+
+3. $X \sim N(15,9)$ find the 25th quantile.
+
+```{r}
+qnorm(.25, mean = 15, sd = 3)
+```
+
+##### Exercise
+
+1. A radar unit is used to measure speeds of cars on a motorway. The speeds are N(90 km/hr, 10 km/hr). What is the probability that a car picked at random is travelling at more than 100 km/hr?
+
+```{r}
+1 - pnorm(100, mean = 90, sd = sqrt(10))
+```
+
+2. GMAT are roughly normally distributed with a mean of 527 and a standard deviation of 112. How high must an individual score on the GMAT in order to score in the highest 5%?
+
+```{r}
+qnorm(.95, mean = 527, sd = 112)
+```
+
+### Exponential Distribution
+
+The Exponential Distribution is defined by the following probability *density function*, where $\dfrac{1}{\lambda}$ is the population mean and the standard deviation.
+
+$f(x) = \lambda e^{-\lambda x}$
+
+If a random variable $X$ follows the Exponential Distribution, then we write: $X \sim Exp(\lambda)$
+
+Here is how the Exponential density looks like: Ex: here $X \sim Exp(1/15)$
+
+```{r echo=FALSE}
+x <- seq(0, 100, length.out=1000)
+dat <- data.frame(x=x, px=dexp(x, rate=1/15))
+
+ggplot(dat, aes(x=x, y=px)) + geom_line()
+```
+
+#### R functions for Exponential Distribution
+
+*Package: stats*
+
+1. Generate a random sample of 100 from $Exp(1/15)$ and create a histogram.
+
+```{r}
+x <- rexp(n = 100, rate = 1/15)
+ggplot(data.frame(x), aes(x = x)) + geom_histogram(binwidth = 5) 
+```
+
+2. If $X \sim Exp(1/15)$ find the probability that X being less than 21: $P(X<21)$
+
+```{r}
+pexp(21, rate = 1/15)
+```
+
+3. If $X \sim Exp(1/15)$ find the 75th quantile.
+
+```{r}
+qexp(.75, rate = 1/15)
+```
+
+##### Exercise
+
+The number of days ahead travelers purchase their airline tickets can be modeled by an exponential distribution with the average amount of time equal to 15 days.
+
+$X \sim Exp(1/15)$
+
+1. Find the probability that a traveler will purchase a ticket fewer than ten days in advance.
+
+```{r}
+pexp(10, rate = 1/15)
+```
+
+2. How many days in advance do 80% of all travelers purchase their airline tickets?
+
+```{r}
+qexp(.2, rate = 1/15)
+```
+
+### Binomial Distribution
+
+The binomial distribution is a *discrete* probability distribution. It describes the outcome of n independent trials in an experiment. Each trial is assumed to have only two outcomes, either success or failure. If the probability of a successful trial is $p$, then the probability of having $x$ successful outcomes in an experiment of $n$ independent trials is as follows:
+
+$f(x) = {n \choose x} p^x (1-p)^{(n-x)} \quad \text{where x = 0, 1, 2,...,n}$
+
+Example: Suppose there are twelve multiple choice questions in an English class quiz. Each question has five possible answers, and only one of them is correct.
+
+1. Find the probability of having exactly four correct answers if a student attempts to answer every question at random.
+
+a. By hand
+
+${12 \choose 4} 0.2^4 (1-0.2)^{(12-4)} = 0.1329$
+
+b. In R
+
+```{r}
+dbinom(4, size=12, prob=0.2) 
+```
+
+2. Find the probability of having four or less correct answers if a student attempts to answer every question at random.
+
+a. By hand
+
+${12 \choose 4} 0.2^4 (1-0.2)^{(12-4)} + {12 \choose 3} 0.2^3 (1-0.2)^{(12-3)} + {12 \choose 2} 0.2^2 (1-0.2)^{(12-2)} + {12 \choose 1} 0.2^1 (1-0.2)^{(12-1)} + {12 \choose 0} 0.2^0 (1-0.2)^{(12-0)} = 0.9274$
+
+b. In R
+
+```{r}
+xs = c(0:4)
+sum = 0
+for (x in xs) {
+    sum = sum + dbinom(x, size=12, prob=0.2)   
+}
+sum
+#there is a function to do this but I don't know the name
+```
+
+## Theoritical Sampling Distribution of the Proportion
+
+Sampling distribution of $\hat{p}$ is normal with mean $p$ (Actual population proportion) and standard deviation of $\sqrt{p(1-p)/n}$
+
+$\hat{p} \sim N( p,  \sqrt{p(1-p)/n} )$
+
+Let’s revisit the coin flip example. Check how close our simulation results are to the theoretical results.
+
+```{r}
+mean(vp$pHeads)
+sd(vp$pHeads)
+```
+
+Now let’s find the theoretical mean and the standard deviation the sampling distribution of the proportion:
+
+Here $p=0.5, n=10$
+
+$\hat{p} \sim N( p, \sqrt{p(1-p)/n} ) = N( 0.5, \sqrt{0.5(1-0.5)/10} ) = N( 0.5, 0.1581139)$
+
+## Sampling Distribution of the Mean
+
+1. Let’s simulate the sampling distribution of the mean of a normal distribution with $N(10, 3^2)$
+
+* Draw 1000 samples of size $n=100$ from this distribution and compute the mean for each sample, and store the mean in a vector called `Xbars`
+* It looks like, in this case, the histogram suggests that the sampling distribution of the sample mean has a *normal* distribution.
+* Find the mean and the standard error of the sampling distribution of the sample mean $\bar{X}$
+
+```{r}
+Xbars = numeric(1000)
+for (i in 1:1000) {
+    x = rnorm(n = 100, mean = 10, sd = 3)
+    Xbars[i] = mean(x)
+}
+
+ggplot(data.frame(Xbars), aes(x = Xbars)) + geom_histogram(bins = 20, color = "white", fill = "steelblue")
+
+mean(Xbars)
+sd(Xbars)
+```
+
+2. Let’s simulate the sampling distribution of the mean of a exponential distribution with $Exp(1/15)$
+
+* Draw 1000 samples of size $n=100$ from this distribution and compute the mean for each sample, and store the mean in a vector called `Xbars2`
+* It looks like, in this case, the histogram suggests that the sampling distribution of the sample mean has a *normal* distribution.
+* Find the mean and the standard error of the sampling distribution of the sample mean $\bar{X}$
+
+```{r}
+Xbars2 = numeric(1000)
+for (i in 1:1000) {
+    x = rexp(n = 100, rate = 1/15)
+    Xbars2[i] = mean(x)
+}
+
+ggplot(data.frame(Xbars2), aes(x = Xbars2)) + geom_histogram(bins = 20, color = "white", fill = "steelblue")
+
+mean(Xbars2)
+sd(Xbars2)
+```
+
+## The central limit theorem (CLT)
+
+For a large sample size (rule of thumb: $n≥30$), the sample mean $\bar{X}$ is approximately normally distributed, regardless of the distribution of the population one samples from. If the population has mean $\mu$ and standard deviation $\sigma$, then $\bar{X}$ has mean and standard error $\sigma/ \sqrt{n}$
+
+Therefore, according to the CLT: $\bar{X} \sim N(\mu, \sigma/ \sqrt{n})$
+
+Note that the spread of the sampling distribution of the mean decreases as the sample size increases.
+
+1. Now that we know the theoretical sampling distribution of $\bar{X}$:
+
+a. Find the theoretical sampling distribution of $\bar{X}$ for question 1 above and compare those with the simulated results.
+    * $\bar{X} \sim N(10, 3/ \sqrt{100})$
+    * $\bar{X} \sim N(10, 0.3)$
+b. Find the theoretical sampling distribution of $\bar{X}$ for question 2 above and compare those with the simulated results.
+    * $\bar{X} \sim N(15, 15/ \sqrt{100})$
+    * $\bar{X} \sim N(15, 1.5)$
+
+*Note: In this class, we only have theoritical sampling distributions for $\hat{p}$ and $\bar{X}$ only. For other sample statistics like median, min, max, etc. we would only have the simulated results.*
+
+# Problem Solving
+
+## Example 
+
+*Finding probabilities using a sampling distribution.*
+
+The engines made by Ford for speedboats had an average power of 220 horsepower (HP) and standard deviation of 15 HP.
+
+A potential buyer intends to take a sample of four engines and will not place an order if the sample mean is less than 215 HP. What is the probability that the buyer will not place an order? Assume that the parent distribution is Normal.
+
+1. Answer the question using a theoretical distribution:
+
+$Pr(\bar{X}<215)= ?$
+
+$\bar{X} \sim N(\mu, \dfrac{\sigma}{\sqrt{n}})$
+
+$\bar{X} \sim N(220, \dfrac{15}{\sqrt{4}})$
+
+$\bar{X} \sim N(220, 7.5)$
+
+```{r}
+pnorm(215, mean = 220, sd = 7.5)
+```
+
+2. Answer the question using a simulation:
+
+```{r}
+Xbars = numeric(1000)
+for (i in 1:1000) {
+    x = rnorm(n = 4, mean = 220, sd = 15)
+    Xbars[i] = mean(x)
+}
+mean(Xbars < 215)
+```
+
+```{r}
+ggplot(data.frame(Xbars), aes(x=Xbars)) + geom_histogram(color = "white", fill = "blue4", bins = 15)
+```
+
+## Example
+
+A friend claim that she has drawn a random sample of size 30, from the exponential distribution $(f(x) = \lambda e^{-\lambda x})$ with $\lambda = 1/10$
+
+The mean of her sample is 12.
+
+1. What is the mean (expected value) of a sample mean?
+
+```{r}
+#10
+```
+
+2. Run a simulation by drawing 100,000 random samples, each of size 30, from $\text{Exp}(\lambda = 1/10)$ and then compute the mean. What proportion of the sample means are as large as or larger than 12?
+
+```{r}
+sims = 100000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = rexp(n = 30, rate = 1/10)
+    Xbars[i] = mean(x)
+}
+mean(Xbars > 12)
+
+ggplot(data.frame(x = Xbars), aes(x = x, fill = x >= 12)) + 
+    geom_histogram(binwidth = 0.1) +
+    theme_bw() +
+    labs(x = expression(bar(x))) +
+    geom_vline(xintercept = 12, linetype = "dashed") +
+    scale_fill_manual(values = c("grey", "black"))
+```
+
+Is a mean of 12 unusual for a sample of size 30 from $\text{Exp}(\lambda = 1/10)$?
+
+Note: Since a mean of 12 or greater appears $13.69%$ of the time, it is not considered unusual.
+
+## Example
+
+Consider the population `{3, 5, 6, 6, 8, 11, 13, 15, 19, 20}`.
+
+1. Compute the mean and standard deviation and create a histogram of its distribution.
+
+```{r}
+v = c(3, 5, 6, 6, 8, 11, 13, 15, 19, 20)
+mean(v)
+sd(v)
+ggplot(data.frame(v), aes(x=v)) + geom_histogram(color = "grey1", fill = "grey3", binwidth = 3)
+```
+
+2. Simulate the sampling distribution of $\bar{X}$ by taking random samples of size 4 and plot your results. Compute the mean and standard error, and compare to population mean and standard deviation.
+
+```{r}
+sims = 100000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = sample(v, size = 4)
+    Xbars[i] = mean(x)
+}
+mean(Xbars)
+sd(Xbars)
+
+ggplot(data.frame(x = Xbars), aes(x = x, fill = x >= 12)) + 
+    geom_histogram(binwidth = 0.5) +
+    theme_bw() +
+    labs(x = expression(bar(x))) +
+    geom_vline(xintercept = 12, linetype = "dashed") +
+    scale_fill_manual(values = c("grey", "black"))
+```
+
+3. Use the simulation to find $P(\bar{X}<11)$
+
+```{r}
+mean(Xbars < 11)
+```
+
+## Example
+
+Suppose the heights of boys in a certain city follow a normal distribution with mean 48 in and variance 9^2.
+
+1. Use the CLT to estimate the probability that in a random sample of 30 boys, the mean height is more than 51 in.
+
+```{r}
+1 - pnorm(51, mean = 48, sd = 9/sqrt(30))
+```
+
+2. Use a simulation to redo part 1.
+
+```{r}
+sims = 100000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = rnorm(n = 30, mean = 48, sd = 9)
+    Xbars[i] = mean(x)
+}
+mean(Xbars > 51)
+```
+
+## Example
+
+The engines made by Ford for speedboats had an average power of 220 horsepower (HP) and standard deviation of 15 HP.
+
+A potential buyer intends to take a sample of four engines and will not place an order if the sample *median* is less than 215 HP. What is the probability that the buyer will not place an order? Assume that the parent distribution is Normal.
+
+1. Answer the question using a theoretical distribution:
+
+**NOT TAUGHT IN THIS CLASS**
+
+2. Answer the question using a simulation:
+
+```{r}
+Medians = numeric(1000)
+for (i in 1:1000) {
+    x = rnorm(n = 4, mean = 220, sd = 15)
+    Medians[i] = median(x)
+}
+mean(Medians < 215)
+```
+
+## Example
+
+4. Let $X_1, X_2, \ldots , X_{10} \overset{i.i.d}\sim N(20, 8)$ and $Y_1, Y_2, \ldots, Y_{15} \overset{i.i.d}\sim N(16, 7)$. Let $W = \bar{X} + \bar{Y}$.
+
+The exact sampling distribution of $W$ is:
+
+$N\left(mean = \mu_1 + \mu_2, sd = \sqrt{\sigma_1^2/n_1 + \sigma_2^2/n_2}\right)$
+
+$N\left(20 + 16, \sqrt{8^2/10 + 7^2/15}\right) = N(36, 3.11)$
+
+b. Simulate the sampling distribution in `R` and plot your results. Check that the simulated mean and standard error are close to the theoretical mean and standard error.
+
+```{r}
+sims = 100000
+Wbars = numeric(sims)
+for (i in 1:sims) {
+    x = rnorm(n = 10, mean = 20, sd = 8)
+    y = rnorm(n = 15, mean = 16, sd = 7)
+    Wbars[i] = mean(x) + mean(y)
+}
+mean(Wbars)
+sd(Wbars)
+```
+
+c. Use your solution to find $P(W < 40)$. 
+
+$\widehat{P(W < 40)} = 0.9011$
+
+## Example
+
+The data set `Recidivism` contains the population of all Iowa offenders convicted of either a felony or misdemeanor who were released in 2010 (Case study in Section 1.4) Of these, 31.6% recidivated and were sent back to prison. Simulate the sampling distribution of $\hat{p}$, the sample proportion of offenders who recidivated, for random samples of size 25.
+
+a. Create a histogram and describe the simulated sampling distribution of $\hat{p}$. Estimate the mean and the standard error.
+
+```{r}
+library(resampledata)
+data("Recidivism")
+sims = 100000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = sample(Recidivism$Recid, size = 25)
+    Xbars[i] = mean(x == "Yes")
+}
+mean(Xbars)
+sd(Xbars)
+
+ggplot(data.frame(x = Xbars), aes(x = x)) + 
+    geom_histogram(binwidth = 0.5) +
+    theme_bw() +
+    labs(x = expression(bar(x)))
+```
+
+*** 
+
+1. Consider the population $\{3, 6, 7, 9, 11, 14\}$. For samples of size 3 without replacement, find (and plot) the sampling distribution of the minimum. What is the mean of the sampling distribution?
+
+```{r}
+set.seed(888)
+v = c(3, 6, 7, 9, 11, 14)
+sims = 100000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = sample(v, size = 3, replace = FALSE)
+    Xbars[i] = min(x)
+}
+
+# Plot of the sampling distribution...
+ggplot(data.frame(x = Xbars), aes(x = x)) + 
+    geom_histogram(bins = 10, color = "white", fill = "steelblue") +
+    theme_bw()
+
+# Mean of the sampling distribution...
+mean(Xbars)
+```
+
+$\bar{X} = 4.80477$
+
+*Note: For the question 2, you need to know about the Uniform distribution is. (We did not talked about this distribution in class) As far as $R$ codes go, knowing how to generate a random sample from a uniform distribution in $R$ is enough.*
+
+2. Let X be a uniform random variable on the interval $[40,60]$ and $Y$ a uniform random variable on $[45,80]$. Assume that $X$ and $Y$ are independent.
+
+a. Simulate the sampling distribution of $X+Y$. Desribe the graph of the distribution of $X+Y$. Compute the mean and variance of the sampling distribution using the simulation.
+
+``` {r}
+set.seed(888)
+sims = 100000
+Wbars = numeric(sims)
+for (i in 1:sims) {
+    x = runif(n = 1, min = 40, max = 60)
+    y = runif(n = 1, min = 45, max = 80)
+    Wbars[i] = x + y
+}
+
+ggplot(data.frame(x = Wbars), aes(x = x)) + 
+    geom_histogram(bins = 20, color = "white", fill = "steelblue") +
+    theme_bw()
+
+mean(Wbars)
+sd(Wbars)^2
+```
+
+**The sampling distribution is skewed right with a mean of $112.4866$ and a variance of $135.3673$**
+
+b. Suppose the time (in minutes) Jack takes to complete his statistics homework is $Unif[40,60]$ and the time Jill takes is $Unif[45,80]$. Assume they work independently. One day they announce that their total time to finish an assignment was less than 90 min. How likely is this?
+
+```{r}
+mean(Wbars < 90)
+```
+
+$\widehat{P(X+Y < 40)} = 0.01796$
+
+3. The amount of time spouses shop for anniversary cards can be modeled by an exponential distribution with the average amount of time equal to 8 minutes.
+
+a. Suppose 10 spouses are shopping for anniversary cards. Use the CLT to estimate the probability that, the mean time spent is less than 5 minutes.
+
+```{r}
+set.seed(888)
+pnorm(5, mean = 8, sd = 8/sqrt(10))
+```
+
+$\widehat{P(X < 5)} = 0.11784$
+
+**Although our theoretical mean and our simulated mean are similar, the CLT does not apply to the problem to the problem above as $n\ngeq30$. Therefore, we cannot assume that the sampling distribution is normal.**
+
+b. Use a simulation to estimate the probability in part (a)
+
+```{r}
+set.seed(888)
+sims = 100000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = rexp(n = 10, rate = 1/8)
+    Xbars[i] = mean(x)
+}
+mean(Xbars < 5)
+```
+
+$\widehat{P(X < 5)} = 0.10225$
+
+4. Consider two populations $A = {3, 5, 7, 9, 10, 16}$ and $B = {8, 10, 11, 15, 18, 25, 28}$
+
+a. Using `R`, draw random samples (without replacement) of size 3 from each population, and simulate the sampling distribution of the sum of their maximum. Describe the distribution.
+
+```{r}
+set.seed(888)
+A = c(3, 5, 7, 9, 10, 16)
+B = c(8, 10, 11, 15, 18, 25, 28)
+sims = 100000
+Wbars = numeric(sims)
+for (i in 1:sims) {
+    x = sample(A, size = 3, replace = FALSE)
+    y = sample(B, size = 3, replace = FALSE)
+    Wbars[i] = max(x) + max(y)
+}
+
+mean(Wbars)
+sd(Wbars)
+
+ggplot(data.frame(x = Wbars), aes(x = x)) + 
+    geom_histogram(bins = 20, color = "white", fill = "steelblue") +
+    theme_bw()
+```
+
+**The distribution is skewed left with a mean of $36.51566$ and a standard error of $6.013892$**
+
+b. Use your simulation to estimate the probability that the sum of the maximums is less than 20.
+
+```{r}
+mean(Wbars < 20)
+```
+
+$\widehat{P(max(\bar{A})+max(\bar{B})) < 20)} = 0.00145$
+
+c. Draw random samples of size 3 from each population, and find the maximum of the union of these two sets. Simulate the sampling distribution of the maximum of this union. Compare the distribution to part (a). In `R`, `max(union(a, b))` returns the maximum of the union of sets `a` and `b`.
+
+```{r}
+set.seed(888)
+A = c(3, 5, 7, 9, 10, 16)
+B = c(8, 10, 11, 15, 18, 25, 28)
+sims = 100000
+Wbars = numeric(sims)
+for (i in 1:sims) {
+    a = sample(A, size = 3, replace = FALSE)
+    b = sample(B, size = 3, replace = FALSE)
+    Wbars[i] = max(union(a, b))
+}
+
+ggplot(data.frame(x = Wbars), aes(x = x)) + 
+    geom_histogram(bins = 20, color = "white", fill = "steelblue") +
+    theme_bw()
+```
+
+**Similar skewed-right distribution as before, but with a lower mean and fewer unique values**
+
+d. Use simulation to find the probability that the maximum of the union is less than 20.
+
+```{r}
+mean(Wbars < 20)
+```
+
+$\widehat{P(max(\bar{A} \cup \bar{B})) < 20)} = 0.00145$
+
+***
+
+1. The data set `FishMercury` contains mercury levels (parts per million) for 30 fish caught in lakes in Minnesota.
+
+a. Create a histogram or boxplot of the data. What do you observe?
+
+```{r}
+ggplot(data = FishMercury, aes(x = Mercury)) + 
+  geom_histogram(bins = 20, fill = "steelblue", color = "white")
+```
+
+b. Bootstrap the mean and record the bootstrap standard error and the 95% bootstrap percentile interval.
+
+```{r}
+set.seed(888)
+n <- length(FishMercury$Mercury) # This is the original sample size
+
+B <- 10000  # The number of bootstrap samples
+boot_Mean <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+
+for (i in 1:B){
+  x <- sample(FishMercury$Mercury, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_Mean[i] <- mean(x)
+}
+
+mean(boot_Mean) # This is the mean of the bootstrap means - so the center of the bootstrap distribution
+sd(boot_Mean) # This is the standard error of the bootstrap distribution
+
+quantile(boot_Mean, probs = c(0.025,0.975))
+```
+
+> $\bar{X} = 0.1819197$
+
+> $\sigma_X = 0.05775204$
+
+> We are 95% confident that the mean mercury concentration in fish is between the values of $0.112$ and $0.3069692$.
+
+c. Remove the outlier and bootstrap the mean of the remaining data. Record the bootstrap standard error and the 95% bootstrap percentile interval.
+
+```{r}
+FishMercuryNoOutlier = FishMercury[-c(1),]
+head(FishMercuryNoOutlier)
+
+ggplot(data = data.frame(FishMercuryNoOutlier), aes(x = FishMercuryNoOutlier)) + 
+  geom_histogram(bins = 10, fill = "steelblue", color = "white")
+
+
+set.seed(888)
+n <- length(FishMercuryNoOutlier) # This is the original sample size
+B <- 10000  # The number of bootstrap samples
+boot_Mean <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+for (i in 1:B){
+  x <- sample(FishMercuryNoOutlier, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_Mean[i] <- mean(x)
+}
+mean(boot_Mean) # This is the mean of the bootstrap means - so the center of the bootstrap distribution
+sd(boot_Mean) # This is the standard error of the bootstrap distribution
+quantile(boot_Mean, probs = c(0.025,0.975))
+```
+
+> $\bar{X} = 0.123513$
+
+> $\sigma_X = 0.007774483$
+
+> We are 95% confident that the mean mercury concentration in fish without outliers is between the values of $0.1079655$ and $0.1385172$.
+
+d. What effect did removing the outlier have on the bootstrap distribution, in particular, the standard error?
+
+> By removing the outlier from the distribution, the mean decreased and the standard error decreased dramatically ($0.05775204$ with the outlier and $0.007774483$ without).
+
+***
+
+2. In section 3.3, we performed a permutation test to determine if men and women consumed, on average, different amounts of hot wings. Here, we do this using bootstraps.
+
+a. Bootstrap the difference in means and describe the bootstrap distribution.
+
+```{r}
+BeerwingsMale = Beerwings %>% filter(Gender == "M")
+BeerwingsFemale = Beerwings %>% filter(Gender == "F")
+
+set.seed(888)
+nm = nrow(BeerwingsMale)
+nf = nrow(BeerwingsFemale)
+B = 10000
+boot_Mean_Diff = numeric(B)
+for (i in 1:B) {
+    m <- sample(BeerwingsMale$Hotwings, size = nm, replace = TRUE)
+    f <- sample(BeerwingsFemale$Hotwings, size = nf, replace = TRUE)
+    boot_Mean_Diff[i] <- mean(m) - mean(f) #male - female
+}
+
+ggplot(data = data.frame(boot_Mean_Diff), aes(x = boot_Mean_Diff)) + 
+  geom_histogram(bins = 20, fill = "orange", color = "grey20")
+
+mean(boot_Mean_Diff)
+sd(boot_Mean_Diff)
+```
+
+> The bootstrap distribution of the difference of the means is normally distributed with a mean of $5.19644$ and a standard error of $1.448123$.
+
+b. Find a 95% bootstrap percentile confidence interval for the difference of means and give a sentence interpreting this interval.
+
+```{r}
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+> We are 95% confident that men consume, on average, between $2.33$ and $8$ more hotwings than women.
+
+***
+
+3. Import the data from `Girls2004` (see Section 1.2).
+
+a. Use `skim()` to obtain summary statistics on the weight of baby girls born in Wyoming and Alaska.
+
+```{r}
+Girls2004 %>% skim()
+```
+
+b. Bootstrap the difference in the means of weight of baby girls born in Wyoming and Arkansas, plot the distribution, Obtain a 95% bootstrap percentile confidence interval and interpret this interval.
+
+```{r}
+GirlsWY = Girls2004 %>% filter(State == "WY")
+GirlsAK = Girls2004 %>% filter(State == "AK")
+
+set.seed(888)
+nwy = nrow(GirlsWY)
+nak = nrow(GirlsAK)
+B = 10000
+boot_Mean_Diff = numeric(B)
+for (i in 1:B) {
+    wy <- sample(GirlsWY$Weight, size = nwy, replace = TRUE)
+    ak <- sample(GirlsAK$Weight, size = nak, replace = TRUE)
+    boot_Mean_Diff[i] <- mean(wy) - mean(ak) #wyoming - alaska
+}
+
+ggplot(data = data.frame(boot_Mean_Diff), aes(x = boot_Mean_Diff)) + 
+  geom_histogram(bins = 20, fill = "pink", color = "white")
+
+mean(boot_Mean_Diff)
+sd(boot_Mean_Diff)
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+> The bootstrap distribution of the difference of the means is normally distributed with a mean of $-307.6122$ and a standard error of $111.1971$.
+
+> $\bar{X} = -307.6122$
+
+> $\sigma_X = 111.1971$
+
+> We are 95% confident that Wyoming girl babies are between $84.87063$ and $523.12688$ grams lighter than Alaska girl babies.
+
+c. What is the bootstrap estimate of the bias?
+
+```{r}
+bootMeanDiff = mean(boot_Mean_Diff)
+ogMeanDiff = (mean(GirlsWY$Weight) - mean(GirlsAK$Weight))
+Bias = bootMeanDiff - ogMeanDiff
+Bias
+```
+
+> $Bias = -307.6122 - (-308.45) = 0.8378375$
+
+***
+
+4. Do chocolate and vanilla ice creams have the same number of calories? The data set `IceCream` contains calorie information for a sample of brands of chocolate and vanilla ice cream. Use the bootstrap to determine whether or not there is a difference in the mean number of calories.
+
+```{r}
+Chocolate = IceCream$ChocolateCalories
+Vanilla = IceCream$VanillaCalories
+
+CalorieDiff = Chocolate - Vanilla
+
+set.seed(888)
+n = length(CalorieDiff)
+B = 10000
+boot_Mean_Diff = numeric(B)
+
+for (i in 1:B) {
+    samp = sample(CalorieDiff, size = n, replace = TRUE)
+    boot_Mean_Diff[i] = mean(samp)
+}
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+> We are 95% confident that the mean calories in chocolate ice cream is between $3.435897$ and $11.435897$ calories higher than the mean number of calories in vanilla ice cream.

@@ -1,0 +1,17 @@
+---
+title: "Quiz 8"
+author: "Matthew Swanson"
+date: "11/7/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+pnorm(8000, mean = 10000, sd = 700)
+
+qnorm(0.90, mean = 10000, sd = 700)
+```
+

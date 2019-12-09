@@ -1,0 +1,163 @@
+---
+title: "Homework 4"
+author: "Matthew Swanson"
+date: "20191119"
+output:
+    bookdown::html_document2:
+    highlight: textmate
+    theme: yeti
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggplot2)
+```
+
+1. Consider the population $\{3, 6, 7, 9, 11, 14\}$. For samples of size 3 without replacement, find (and plot) the sampling distribution of the minimum. What is the mean of the sampling distribution?
+
+```{r}
+set.seed(888)
+v = c(3, 6, 7, 9, 11, 14)
+sims = 100000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = sample(v, size = 3, replace = FALSE)
+    Xbars[i] = min(x)
+}
+
+# Plot of the sampling distribution...
+ggplot(data.frame(x = Xbars), aes(x = x)) + 
+    geom_histogram(bins = 10, color = "white", fill = "steelblue") +
+    theme_bw()
+
+# Mean of the sampling distribution...
+mean(Xbars)
+```
+
+$\bar{X} = 4.80477$
+
+*Note: For the question 2, you need to know about the Uniform distribution is. (We did not talked about this distribution in class) As far as $R$ codes go, knowing how to generate a random sample from a uniform distribution in $R$ is enough.*
+
+2. Let X be a uniform random variable on the interval $[40,60]$ and $Y$ a uniform random variable on $[45,80]$. Assume that $X$ and $Y$ are independent.
+
+a. Simulate the sampling distribution of $X+Y$. Desribe the graph of the distribution of $X+Y$. Compute the mean and variance of the sampling distribution using the simulation.
+
+``` {r}
+set.seed(888)
+sims = 100000
+Wbars = numeric(sims)
+for (i in 1:sims) {
+    x = runif(n = 1, min = 40, max = 60)
+    y = runif(n = 1, min = 45, max = 80)
+    Wbars[i] = x + y
+}
+
+ggplot(data.frame(x = Wbars), aes(x = x)) + 
+    geom_histogram(bins = 20, color = "white", fill = "steelblue") +
+    theme_bw()
+
+mean(Wbars)
+sd(Wbars)^2
+```
+
+**The sampling distribution is skewed right with a mean of $112.4866$ and a variance of $135.3673$**
+
+b. Suppose the time (in minutes) Jack takes to complete his statistics homework is $Unif[40,60]$ and the time Jill takes is $Unif[45,80]$. Assume they work independently. One day they announce that their total time to finish an assignment was less than 90 min. How likely is this?
+
+```{r}
+mean(Wbars < 90)
+```
+
+$\widehat{P(X+Y < 40)} = 0.01796$
+
+3. The amount of time spouses shop for anniversary cards can be modeled by an exponential distribution with the average amount of time equal to 8 minutes.
+
+a. Suppose 10 spouses are shopping for anniversary cards. Use the CLT to estimate the probability that, the mean time spent is less than 5 minutes.
+
+```{r}
+set.seed(888)
+pnorm(5, mean = 8, sd = 8/sqrt(10))
+```
+
+$\widehat{P(X < 5)} = 0.11784$
+
+**Although our theoretical mean and our simulated mean are similar, the CLT does not apply to the problem to the problem above as $n\ngeq30$. Therefore, we cannot assume that the sampling distribution is normal.**
+
+b. Use a simulation to estimate the probability in part (a)
+
+```{r}
+set.seed(888)
+sims = 100000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = rexp(n = 10, rate = 1/8)
+    Xbars[i] = mean(x)
+}
+mean(Xbars < 5)
+```
+
+$\widehat{P(X < 5)} = 0.10225$
+
+4. Consider two populations $A = {3, 5, 7, 9, 10, 16}$ and $B = {8, 10, 11, 15, 18, 25, 28}$
+
+a. Using `R`, draw random samples (without replacement) of size 3 from each population, and simulate the sampling distribution of the sum of their maximum. Describe the distribution.
+
+```{r}
+set.seed(888)
+A = c(3, 5, 7, 9, 10, 16)
+B = c(8, 10, 11, 15, 18, 25, 28)
+sims = 100000
+Wbars = numeric(sims)
+for (i in 1:sims) {
+    x = sample(A, size = 3, replace = FALSE)
+    y = sample(B, size = 3, replace = FALSE)
+    Wbars[i] = max(x) + max(y)
+}
+
+mean(Wbars)
+sd(Wbars)
+
+ggplot(data.frame(x = Wbars), aes(x = x)) + 
+    geom_histogram(bins = 20, color = "white", fill = "steelblue") +
+    theme_bw()
+```
+
+**The distribution is skewed left with a mean of $36.51566$ and a standard error of $6.013892$**
+
+b. Use your simulation to estimate the probability that the sum of the maximums is less than 20.
+
+```{r}
+mean(Wbars < 20)
+```
+
+$\widehat{P(max(\bar{A})+max(\bar{B})) < 20)} = 0.00145$
+
+c. Draw random samples of size 3 from each population, and find the maximum of the union of these two sets. Simulate the sampling distribution of the maximum of this union. Compare the distribution to part (a). In `R`, `max(union(a, b))` returns the maximum of the union of sets `a` and `b`.
+
+```{r}
+set.seed(888)
+A = c(3, 5, 7, 9, 10, 16)
+B = c(8, 10, 11, 15, 18, 25, 28)
+sims = 100000
+Wbars = numeric(sims)
+for (i in 1:sims) {
+    a = sample(A, size = 3, replace = FALSE)
+    b = sample(B, size = 3, replace = FALSE)
+    Wbars[i] = max(union(a, b))
+}
+
+ggplot(data.frame(x = Wbars), aes(x = x)) + 
+    geom_histogram(bins = 20, color = "white", fill = "steelblue") +
+    theme_bw()
+```
+
+**Similar skewed-right distribution as before, but with a lower mean and fewer unique values**
+
+d. Use simulation to find the probability that the maximum of the union is less than 20.
+
+```{r}
+mean(Wbars < 20)
+```
+
+$\widehat{P(max(\bar{A} \cup \bar{B})) < 20)} = 0.00145$

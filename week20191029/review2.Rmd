@@ -1,0 +1,60 @@
+---
+title: "Test 2 Review"
+author: "Matthew Swanson"
+date: "10/30/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. Use the `Recidivism` data from the `resampledata` library for this problem. Test the hypothesis that: *The mean days to `Days` to reoffend for men is higher than for women?*
+i. Assume that $\mu_M$ and $\mu_W$ be the mean `Days` to reoffend for men and women respectively. Write $H_0$ and $H_a$ for this problem.
+    
+* $H_0: \mu_M - \mu_W = 0$
+* $H_a: \mu_M - \mu_W > 0$
+
+*Note: use* `set.seed(10001)`
+
+ii. Conduct the test.
+
+```{r}
+library(resampledata)
+data("Recidivism")
+library(dplyr)
+library(knitr)
+
+ans = Recidivism %>%
+  group_by(Gender) %>%
+  summarize(mean = mean(Days, na.rm = TRUE), N = n())
+ans
+md = ans[2,2] - ans[1,2]
+observed = md$mean
+observed
+
+set.seed(10001)
+sims = 10^4-1 # Number of simulations (iterations)
+ans = numeric(sims)
+for(i in 1:sims){
+  index = sample.int(n = 17019, size = 14918, replace = FALSE) #n = total, size = num in the first group
+  ans[i] = mean(Recidivism$Days[index], na.rm=TRUE) - mean(Recidivism$Days[-index], na.rm=TRUE)
+}
+pvalue = (sum(ans >= observed) + 1)/(sims + 1)
+pvalue
+```
+
+Make conclusion assuming $\alpha = 0.05$
+
+a. Technical conclusion
+
+```{r}
+#code
+```
+
+b. Non-technical conclusion
+
+```{r}
+#code
+```
+

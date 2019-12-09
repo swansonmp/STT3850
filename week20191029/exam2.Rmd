@@ -1,0 +1,233 @@
+---
+title: "Exam 2"
+author: "Matthew Swanson"
+date: "10/31/2019"
+output: bookdown::html_book
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(fig.width=5, fig.height=2, echo = TRUE)
+library(resampledata)
+data(Verizon)
+library(dplyr)
+library(knitr)
+library(moderndive)
+library(ggplot2)
+library(skimr)
+library(gapminder)
+data(gapminder2007)
+data(evals)
+gapminder2007 = gapminder %>%
+    filter(year == 2007) %>%
+    select(country, continent, lifeExp, gdpPercap)
+```
+
+# Hypothesis Testing
+
+Let $\mu_1$ denote the mean repair time for the the ILEC customers and $\mu_2$ the mean repair time for the the CLEC customers.
+
+Form the hypothesis. $H_0: \mu_1 - \mu_2 = 0$ vs. $H_a: \mu_1 - \mu_2 < 0$
+
+Conduct the test.
+
+```{r}
+ans <- Verizon %>%
+  group_by(Group) %>%
+  summarize(mean = mean(Time), N = n())
+#ans
+md = ans[2,2] - ans[1,2]
+observed = md$mean
+observed
+
+set.seed(84)
+sims <- 10^4-1 # Number of simulations (iterations)
+ans <- numeric(sims)
+for(i in 1:sims){
+  index <- sample.int(n = 1687, size = 1664, replace = FALSE) #n = total, size = num in the first group
+  ans[i] <- mean(Verizon$Time[index]) - mean(Verizon$Time[-index])
+}
+pvalue <- (sum(ans <= observed) + 1)/(sims + 1)
+pvalue
+```
+
+Step 5: Make the decision –
+
+Technical conclusion: $P$-Value < 0.05, so Reject $H_0$.
+
+English conclusion: There is enough evidence to conclude that the Verizon spend significantly more time to complete repairs for CLEC customers than for the ILEC customers.
+
+# Exploratory Data Analysis
+
+A crucial step before doing any kind of modeling or analysis is performing an exploratory data analysis, or EDA, of all our data.
+
+1. Just looking at the raw values, in a spreadsheet for example.
+
+```{r eval=FALSE}
+#View(evals) #only works in the console
+#?evals
+#glimpse(evals)
+```
+
+2. Computing summary statistics likes means, medians, and standard deviations.
+
+```{r}
+#evals %>% 
+#  select(score, bty_avg) %>% 
+#  skim()
+```
+
+a. 
+
+Getting correlation
+
+```{r}
+#cor(x = evals$bty_avg, y = evals$score)
+```
+
+
+3. Creating data visualizations.
+
+```{r}
+ggplot(data = evals, mapping = aes(x = bty_avg, y = score)) + 
+    geom_point() +
+    geom_jitter() + 
+    labs(x = "Beauty Score", y = "Teaching Score", title = "Relationship Between Teaching and Beauty Scores") +
+    geom_smooth(method = "lm")
+```
+
+# Simple linear model
+
+```{r}
+score_model <- lm(score ~ bty_avg, data = evals) #y ~ x
+score_model
+```
+
+* $\hat{\text{score}} = b_0 + b_1 \cdot \text{bty_avg}$
+* $\hat{\text{score}} = 3.8803 + 0.0666 \cdot \text{bty_avg}$
+
+# Residual Plot
+
+The plot of residuals against the fitted values ($\hat{y}$, $y_i-\hat{y_i}$) provides infomation on the appropriateness of a *straight-line* model. Ideally, points should be scattered randomly about the reference line $y=0$
+
+```{r}
+#ggplot(score_model, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+# lm w/ one categorical explanatory variable
+
+```{r}
+meanAfrica = 54.806
+tbl = gapminder2007 %>%
+    group_by(continent) %>%
+    summarize(mean = round(mean(lifeExp),3), vsAfrica = round(mean(lifeExp),3)-meanAfrica)
+#kable(tbl)
+```
+
+Now, let’s use the `lm` function we introduced in Section 6.1 to get the regression coefficients for `gapminder2007` analysis:
+
+```{r eval=FALSE}
+lifeExp_model <- lm(lifeExp ~ continent, data = gapminder2007)
+lifeExp_model
+
+summary(lifeExp_model)
+```
+
+What are these values? First, we must describe the equation for fitted value $\hat{y}$, which is a little more complicated when the $x$ explanatory variable is categorical:
+
+$\hat{\text{life exp}} = b_0 + b_{Amer} \cdot 1_{Amer}(x) + b_{Asia} \cdot 1_{Asia}(x) + b_{Euro} \cdot 1_{Euro}(x) + b_{Ocean} \cdot 1_{Ocean}(x)$
+
+$\hat{\text{life exp}} = 54.81 + 18.80 \cdot 1_{Amer}(x) + 15.92 \cdot 1_{Asia}(x) +  22.84 \cdot 1_{Euro}(x) + 25.91 \cdot 1_{Ocean}(x)$
+
+# Multiple Regressions
+
+## One numerical & one categorical explanatory variable
+    
+### EDA
+
+```{r}
+evals_ch7 = evals %>% select(age, gender, score)
+#glimpse(evals_ch7)
+#evals_ch7 %>% skim()
+```
+
+3. Let’s compute the correlation between two numerical variables we have `score` and `age`. Recall that correlation coefficients only exist between *numerical* variables.
+
+```{r}
+evals_ch7 %>% 
+  get_correlation(formula = score ~ age)
+```
+
+We observe that the `age` and the `score` are *weakly* and *negatively* correlated.
+
+Now, let’s try to visualize the correlation.
+
+* Create a scatterplot of `score` over `age`. Use the binary `gender` variable to color the point with two colors. Add a regression line (or two) in to your scatterplot.
+    * Say a couple of interesting things about the graph you’ve created.
+
+```{r}
+ggplot(data = evals_ch7, mapping = aes(x = age, y = score, color = gender)) + 
+    geom_point(alpha = 0.5) +
+    labs(x = "Age", y = "Teaching Score", title = "Using method = lm") +
+    geom_smooth(method = "lm", se = FALSE)
+```
+
+* Females experience a more severe decline in teaching score with age
+* Many of the poor teaching scores for men come from men over 55, while many of the poor teaching scores for women come from women between 35 and 55
+
+## Parallel slopes model
+
+```{r}
+score_model_ch7 = lm(score ~ age + gender, data = evals_ch7)
+
+#score_model_ch7
+#get_regression_table(score_model_ch7)
+```
+
+Full: $\hat{Score} = 4.48 - 0.009 \cdot age + 0.191 \cdot 1_{Male}(x)$
+
+Male: $\hat{Score_M} = 4.671 - 0.009 \cdot age$
+
+Female: $\hat{Score_F} = 4.48 - 0.009 \cdot age$
+
+``` {r}
+ggplot(data = evals_ch7, mapping = aes(x = age, y = score, color = gender)) + 
+    geom_point(alpha = 0.5) +
+    labs(x = "Age", y = "Teaching Score", title = "Using Parallel Slopes") +
+    geom_abline(intercept = 4.48, slope = -0.009, color = "tomato", lwd=1) +
+    geom_abline(intercept = 4.671, slope = -0.009, color = "mediumturquoise", lwd=1)
+```
+
+Interpretaions of the coefficients:
+
+* $b_{male}=0.1906$ is the average difference in teaching score that men get relative to the baseline of women.
+* Accordingly, the intercepts (which in this case make no sense since no instructor can have an age of 0) are :
+    * for women: $b_0=4.484$
+    * for men: $b_0+b_{male}=4.484+0.191=4.675$ 
+* Both men and women have the same slope. In other words, in this model the associated effect of age is the same for men and women. So for every increase of one year in age, there is on average an associated decrease of $b_{age}=−0.009$ in teaching score.
+
+## Interaction Model
+
+```{r }
+score_model_interaction <- lm(score ~ age + gender + age * gender, data = evals_ch7)
+#get_regression_table(score_model_interaction)
+```
+
+The modeling equation for this scenario is (Writing the equation):
+
+$\hat{y} = b_0 + b_1 \cdot x_1 + b_2 \cdot x_2 + b_3 \cdot x_1 \cdot x_2$
+
+$\hat{score} = 4.883 - 0.018 \cdot age - 0.446 \cdot 1_{Male}(x) + 0.014   \cdot age \cdot 1_{Male}(x)$
+
+
+* Male: $\hat{score} = 4.437 - 0.004 \cdot age$
+* Female: $\hat{score} = 4.883 - 0.018 \cdot age$
+
+We see that while male instructors have a lower intercept, as they age, they have a less steep associated average decrease in teaching scores: 0.004 teaching score units per year as opposed to -0.018 for women. This is consistent with the different slopes and intercepts of the red and blue regression lines fit in the original scatter plot.
+
+``` {r}
+ggplot(data = evals_ch7, mapping = aes(x = age, y = score, color = gender)) + 
+    geom_point(alpha = 0.5) +
+    labs(x = "Age", y = "Teaching Score", title = "Using Parallel Slopes") +
+    geom_abline(intercept = 4.883, slope = -0.018, color = "tomato", lwd=1) +
+    geom_abline(intercept = 4.437, slope = -0.004, color = "mediumturquoise", lwd=1)
+```

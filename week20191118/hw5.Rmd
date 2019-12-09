@@ -1,0 +1,208 @@
+---
+title: "Homework 5"
+author: "Matthew Swanson"
+date: "20191126"
+output:
+    bookdown::html_document2:
+    highlight: textmate
+    theme: yeti
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=4, fig.height=3, echo = TRUE)
+
+library(dplyr)
+library(skimr)
+library(ggplot2)
+library(resampledata)
+data("FishMercury")
+data("Beerwings")
+data("Girls2004")
+data("IceCream")
+```
+
+1. The data set `FishMercury` contains mercury levels (parts per million) for 30 fish caught in lakes in Minnesota.
+
+a. Create a histogram or boxplot of the data. What do you observe?
+
+```{r}
+ggplot(data = FishMercury, aes(x = Mercury)) + 
+  geom_histogram(bins = 20, fill = "steelblue", color = "white")
+```
+
+b. Bootstrap the mean and record the bootstrap standard error and the 95% bootstrap percentile interval.
+
+```{r}
+set.seed(888)
+n <- length(FishMercury$Mercury) # This is the original sample size
+
+B <- 10000  # The number of bootstrap samples
+boot_Mean <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+
+for (i in 1:B){
+  x <- sample(FishMercury$Mercury, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_Mean[i] <- mean(x)
+}
+
+mean(boot_Mean) # This is the mean of the bootstrap means - so the center of the bootstrap distribution
+sd(boot_Mean) # This is the standard error of the bootstrap distribution
+
+quantile(boot_Mean, probs = c(0.025,0.975))
+```
+
+> $\bar{X} = 0.1819197$
+
+> $\sigma_X = 0.05775204$
+
+> We are 95% confident that the mean mercury concentration in fish is between the values of $0.112$ and $0.3069692$.
+
+c. Remove the outlier and bootstrap the mean of the remaining data. Record the bootstrap standard error and the 95% bootstrap percentile interval.
+
+```{r}
+FishMercuryNoOutlier = FishMercury[-c(1),]
+head(FishMercuryNoOutlier)
+
+ggplot(data = data.frame(FishMercuryNoOutlier), aes(x = FishMercuryNoOutlier)) + 
+  geom_histogram(bins = 10, fill = "steelblue", color = "white")
+
+
+set.seed(888)
+n <- length(FishMercuryNoOutlier) # This is the original sample size
+B <- 10000  # The number of bootstrap samples
+boot_Mean <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+for (i in 1:B){
+  x <- sample(FishMercuryNoOutlier, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_Mean[i] <- mean(x)
+}
+mean(boot_Mean) # This is the mean of the bootstrap means - so the center of the bootstrap distribution
+sd(boot_Mean) # This is the standard error of the bootstrap distribution
+quantile(boot_Mean, probs = c(0.025,0.975))
+```
+
+> $\bar{X} = 0.123513$
+
+> $\sigma_X = 0.007774483$
+
+> We are 95% confident that the mean mercury concentration in fish without outliers is between the values of $0.1079655$ and $0.1385172$.
+
+d. What effect did removing the outlier have on the bootstrap distribution, in particular, the standard error?
+
+> By removing the outlier from the distribution, the mean decreased and the standard error decreased dramatically ($0.05775204$ with the outlier and $0.007774483$ without).
+
+***
+
+2. In section 3.3, we performed a permutation test to determine if men and women consumed, on average, different amounts of hot wings. Here, we do this using bootstraps.
+
+a. Bootstrap the difference in means and describe the bootstrap distribution.
+
+```{r}
+BeerwingsMale = Beerwings %>% filter(Gender == "M")
+BeerwingsFemale = Beerwings %>% filter(Gender == "F")
+
+set.seed(888)
+nm = nrow(BeerwingsMale)
+nf = nrow(BeerwingsFemale)
+B = 10000
+boot_Mean_Diff = numeric(B)
+for (i in 1:B) {
+    m <- sample(BeerwingsMale$Hotwings, size = nm, replace = TRUE)
+    f <- sample(BeerwingsFemale$Hotwings, size = nf, replace = TRUE)
+    boot_Mean_Diff[i] <- mean(m) - mean(f) #male - female
+}
+
+ggplot(data = data.frame(boot_Mean_Diff), aes(x = boot_Mean_Diff)) + 
+  geom_histogram(bins = 20, fill = "orange", color = "grey20")
+
+mean(boot_Mean_Diff)
+sd(boot_Mean_Diff)
+```
+
+> The bootstrap distribution of the difference of the means is normally distributed with a mean of $5.19644$ and a standard error of $1.448123$.
+
+b. Find a 95% bootstrap percentile confidence interval for the difference of means and give a sentence interpreting this interval.
+
+```{r}
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+> We are 95% confident that men consume, on average, between $2.33$ and $8$ more hotwings than women.
+
+***
+
+3. Import the data from `Girls2004` (see Section 1.2).
+
+a. Use `skim()` to obtain summary statistics on the weight of baby girls born in Wyoming and Alaska.
+
+```{r}
+Girls2004 %>% skim()
+```
+
+b. Bootstrap the difference in the means of weight of baby girls born in Wyoming and Arkansas, plot the distribution, Obtain a 95% bootstrap percentile confidence interval and interpret this interval.
+
+```{r}
+GirlsWY = Girls2004 %>% filter(State == "WY")
+GirlsAK = Girls2004 %>% filter(State == "AK")
+
+set.seed(888)
+nwy = nrow(GirlsWY)
+nak = nrow(GirlsAK)
+B = 10000
+boot_Mean_Diff = numeric(B)
+for (i in 1:B) {
+    wy <- sample(GirlsWY$Weight, size = nwy, replace = TRUE)
+    ak <- sample(GirlsAK$Weight, size = nak, replace = TRUE)
+    boot_Mean_Diff[i] <- mean(wy) - mean(ak) #wyoming - alaska
+}
+
+ggplot(data = data.frame(boot_Mean_Diff), aes(x = boot_Mean_Diff)) + 
+  geom_histogram(bins = 20, fill = "pink", color = "white")
+
+mean(boot_Mean_Diff)
+sd(boot_Mean_Diff)
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+> The bootstrap distribution of the difference of the means is normally distributed with a mean of $-307.6122$ and a standard error of $111.1971$.
+
+> $\bar{X} = -307.6122$
+
+> $\sigma_X = 111.1971$
+
+> We are 95% confident that Wyoming girl babies are between $84.87063$ and $523.12688$ grams lighter than Alaska girl babies.
+
+c. What is the bootstrap estimate of the bias?
+
+```{r}
+bootMeanDiff = mean(boot_Mean_Diff)
+ogMeanDiff = (mean(GirlsWY$Weight) - mean(GirlsAK$Weight))
+Bias = bootMeanDiff - ogMeanDiff
+Bias
+```
+
+> $Bias = -307.6122 - (-308.45) = 0.8378375$
+
+***
+
+4. Do chocolate and vanilla ice creams have the same number of calories? The data set `IceCream` contains calorie information for a sample of brands of chocolate and vanilla ice cream. Use the bootstrap to determine whether or not there is a difference in the mean number of calories.
+
+```{r}
+Chocolate = IceCream$ChocolateCalories
+Vanilla = IceCream$VanillaCalories
+
+CalorieDiff = Chocolate - Vanilla
+
+set.seed(888)
+n = length(CalorieDiff)
+B = 10000
+boot_Mean_Diff = numeric(B)
+
+for (i in 1:B) {
+    samp = sample(CalorieDiff, size = n, replace = TRUE)
+    boot_Mean_Diff[i] = mean(samp)
+}
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+> We are 95% confident that the mean calories in chocolate ice cream is between $3.435897$ and $11.435897$ calories higher than the mean number of calories in vanilla ice cream.

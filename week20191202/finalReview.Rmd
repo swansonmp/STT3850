@@ -1,0 +1,77 @@
+---
+title: "Final Review"
+author: "Matthew Swanson"
+date: "11/21/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ISLR)
+data(Credit)
+
+cLimit = Credit$Limit # This is my original SAMPLE 
+n = length(cLimit) # This is the original sample size
+B <- 10000  # The number of bootstrap samples
+boot_Mean <- numeric(B) # A vector to store bootstrap menas from the bootstrap samples
+set.seed(888)
+for (i in 1:B){
+  x <- sample(cLimit, size = n, replace = TRUE) # Here n is the size of your bootstrap sample
+  boot_Mean[i] <- mean(x)
+}
+
+mean(boot_Mean) # This is the mean of the bootstrap means - so the center of the bootstrap distribution
+sd(boot_Mean) # This is the standard error of the bootstrap distribution
+
+quantile(boot_Mean, probs = c(0.025,0.975))
+```
+
+```{r}
+pnorm(8000, mean = 10000, sd = 10000 / sqrt(30))
+```
+
+```{r}
+set.seed(888)
+Xbars = numeric(10000)
+for (i in 1:1000) {
+    x = rexp(n = 30, rate = 1/1000)
+    Xbars[i] = mean(x)
+}
+
+mean(Xbars < 8000)
+```
+
+```{r}
+library(resampledata)
+data("Beerwings")
+Beer_model = lm(Beer ~ Hotwings, data = Beerwings)
+Beer_model
+```
+
+```{r}
+data(FlightDelays)
+
+library(dplyr)
+library(knitr)
+ans <- Beerwings %>%
+  group_by(Gender) %>%
+  summarize(Mean = mean(Beer), N = n())
+ans
+md = ans[2,2] - ans[1,2]
+observed = md$Mean
+observed
+
+set.seed(104)
+sims <- 10^4-1 # Number of simulations (iterations)
+ans <- numeric(sims)
+for(i in 1:sims){
+  index <- sample.int(n = 4029, size = 1123, replace = FALSE) #n = total, size = num in the first group
+  ans[i] <- mean(Beerwings$[index]) - mean(Beerwings$[-index])
+}
+pvalue <- 2*(sum(ans >= observed) + 1)/(sims + 1)
+pvalue
+```
+

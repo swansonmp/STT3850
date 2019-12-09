@@ -1,3 +1,13 @@
+---
+title: "**Multiple Linear Regression Project**"
+author: "Ashely Siebelink, Dorian Brown, Matthew Swanson, William Sease"
+date: '`r format(Sys.time(), "%b %d, %Y")`'
+output:
+  bookdown::html_document2:
+    highlight: textmate
+    theme: yeti
+---
+
 ```{r, include = FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.align = "center", comment = NA, options(scipen=999))
 
@@ -9,21 +19,14 @@ library(cowplot)
 library(plotly)
 ```
 
+```{r}
+df <- read.table("EXECSAL2.txt", header = T)
+#kable(head(df))
+```
+
 # Data Description
 
-After you graduated, you started to work for one of the best firms in the country. You were hired because you have Data Analysis skills with $R$. During your first week your manager comes to your office and gives you the following data set and ask you to “analyze the hell out of this data” (his words. not mine). Mainly he wants you to build a linear model to predict executive salaries. But you know you can do much more! Analyze the given data and create a report like your job depends on this.
-
-Data stored as a `.txt` file under week 10. Data consists of 11 variables.
-
-
-# Load Data into R
-
-```{r}
-
-df <- read.table("EXECSAL2.txt", header = T)
-
-kable(head(df))
-```
+First, we load the `EXECSAL2.txt` into $R$. Then, we change all variable names to more descriptive ones.
 
 ```{r}
 varTable = data.frame(
@@ -40,20 +43,16 @@ names(varTable) <- c("Variable", "Name", "Description")
 kable(varTable)
 ```
 
-
-
-# Read Table
 ```{r}
 df = read.table("EXECSAL2.txt", header = T)
 ```
 
-# Rename Columns
 ```{r}
-# rename columns
 names(df) = c("id", "salary", "experience", "education", "gender", "emps_sup", "assets", "board_mb", "age", "profit", "int_res", "sales")
 # remove id column
 df = df %>% select(salary, experience, education, gender, emps_sup, assets, board_mb, age, profit, int_res, sales)
 ```
+
 
 # Conduct EDA
 
@@ -61,14 +60,6 @@ df = df %>% select(salary, experience, education, gender, emps_sup, assets, boar
 ```{r}
 kable(head(df))
 ```
-
-* In console
-
-    * library(ISLR)
-    
-    * View(df)
-
-    * ?df
 
 ## Computing Summary Statistics
 ``` {r}
@@ -82,37 +73,41 @@ df_factor %>% skim()
 
 ### Description of Summary Statistics
 
-  * The minimum value of `age` = 23, `assets` = 150, `education` = 12, `emps_sup` = 60, `experience` = 1, `profit` = 5, `sales` = 20, and `salary` = 12.06.
+   * The minimum value of $age = 23, assets = 150, education = 12, emps\_sup = 60, experience = 1, profit = 5, sales = 20$, salary = 12.06$.
   
-  * The maximum value of `age` = 64, `assets` = 200, `education` = 20, `emps_sup` = 600, `experience` = 26, `profit` = 10, `sales` = 30, `salary` = 10.66.
+  * The maximum value of $age = 64, assets = 200, education = 20, emps\_sup = 600, experience = 26, profit = 10, sales = 30, salary = 10.66$.
   
-  * The mean value of `age` = 42.84, `assets` = 175.1, `education` = 16.02, `emps_sup` = 340.1, `experience` = 13.08, `profit` = 7.7,  `sales` = 24.83, `salary` = 11.46.
+  * The mean value of $age = 42.84, assets = 175.1, education = 16.02, emps\_sup = 340.1, experience = 13.08, profit = 7.7,  sales = 24.83, salary = 11.46$.
+
+  * The standard deviation of $age = 9.07, assets = 15.41, education = 2.3, emps\_sup = 167.18, experience = 7.34, profit = 1.55, sales = 2.74, salary = 0.26$. A higher standard deviation means the data has a larger range of values, therefore, emps_sup has the largest range and salary has the smallest range.
+  
+  * The middle 50% of age ranges from $37-49.25$, assets from $160-190$, education from $14-18$, emps_sup from $187.5-492.5$, experience from $7.75-20$, profit from $6-9$, sales from $23-27$, and salary from $11.28-11.61$.
 
   
-  * The standard deviation of `age` = 9.07, `assets` = 15.41, `education` = 2.3, `emps_sup` = 167.18, `experience` = 7.34, `profit` = 1.55, `sales` = 2.74, `salary` = 0.26.
-  
-  * From these histograms we can see that;
+From these histograms we can see that;
   
 ```{r}
 Variable <- c("age", "assets", "education", "emps_sup", "experience", "profit", "sales", "salary")
 Distribution <- c("Normal","Random","Mostly Uniform","Mostly Uniform","Random","Random","Skewed Right","Skewed Left")
 tibble(Variable, Distribution)
 ```
-    * This means the number of people with an age between 33.77and 51.91 is larger than the number of people of ages outside this range.
+
+  * This means the number of people with an age between 33.77 and 51.91 is larger than the number of people of ages outside this range.
   
-    * This means the value of assets is random across the population.
+  * This means the value of assets is random across the population.
   
-    * This means the number of people with any number of years of education is evenly distributed.
+  * This means the number of people with any number of years of education is evenly distributed.
   
-    * This means the number of employees supervised is evenly distributed.
+  * This means the number of employees supervised is evenly distributed.
   
-    * This means the number of years of experience is random across the population.
+  * This means the number of years of experience is random across the population.
   
-    * This means the value of profit is random across the population.
+  * This means the value of profit is random across the population.
     
-    * This means the company's total sales is \$25 million or below.
+  * This means the company's total sales is $25 million or below.
       
-    * This means the executive salary is \$11.46 million or above.
+  * This means the executive salary is $11.46 million or above.
+
 
 
 ## Creating Data Visualizations
@@ -188,13 +183,17 @@ summary(salary_model)
 ggplot(salary_model, aes(x = .fitted, y = .resid)) + geom_point()
 ```
 
-> $\hat{Salary} = 10.14 + 0.027 \cdot experience + 0.022 \cdot education + 0.003 \cdot assets + 0.185 \cdot 1_{Male}(x)$
+$$\hat{Salary} = 10.14 + 0.027 \cdot experience + 0.022 \cdot education + 0.003 \cdot assets + 0.185 \cdot 1_{Male}(x)$$
 
-Male executive model: $\hat{Salary} = 10.325 + 0.027 \cdot experience + 0.022 \cdot education + 0.003 \cdot assets$
+Male executive model: 
 
-Female executive model: $\hat{Salary} = 10.14 + 0.027 \cdot experience + 0.022 \cdot education + 0.003 \cdot assets$
+$$\hat{Salary} = 10.325 + 0.027 \cdot experience + 0.022 \cdot education + 0.003 \cdot assets$$
 
-In our base model, we could extrapolate that executives have a salary of $10.14 million assuming they have no experience and no education, With every extra year of experience and education, one could expect their salary to increase by \$27,000 and \$22,000 million respectively. Male exexcutives, on average, make \$185,000 more than their female counterparts with similar experience, education, and assets.
+Female executive model: 
+
+$$\hat{Salary} = 10.14 + 0.027 \cdot experience + 0.022 \cdot education + 0.003 \cdot assets$$
+
+In our base model, we could extrapolate that executives have a salary of $10.14 million assuming they have no experience and no education, With every extra year of experience and education, one could expect their salary to increase by \$27,000 and \$22,000 million respectively. Male executives, on average, make \$185,000 more than their female counterparts with similar experience, education, and assets.
 
 ### Experience & Gender: Interaction Model
 
@@ -205,11 +204,15 @@ expGen_model <- lm(salary ~ experience + gender + experience*gender, data = df)
 get_regression_table(expGen_model)
 ```
 
-> $\hat{score} = 11 + 0.026 \cdot experience + 0.174 \cdot 1_{Male}(x) + 0.002 \cdot experience \cdot 1_{Male}(x)$
+$$\hat{score} = 11 + 0.026 \cdot experience + 0.174 \cdot 1_{Male}(x) + 0.002 \cdot experience \cdot 1_{Male}(x)$$
 
-Female experience model: $\hat{score}_F = 11 + 0.026 \cdot experience$
+Female experience model: 
 
-Male experience model: > $\hat{score}_M = 11.174 + 0.028 \cdot experience$
+$$\hat{score}_F = 11 + 0.026 \cdot experience$$
+
+Male experience model: 
+
+$$\hat{score}_M = 11.174 + 0.028 \cdot experience$$
 
 ```{r echo=FALSE}
 ggplot(data = df_factor, mapping = aes(x = experience, y = salary, color = gender)) + 
@@ -221,12 +224,33 @@ ggplot(data = df_factor, mapping = aes(x = experience, y = salary, color = gende
 
 As we can see from the models, male executives have both higher base salaries than women in addition to marginally higher increase in salaries with an increase in experience. However, as evidenced from the graph, this interaction between `experience` and `gender` is negligible, as both genders encounter an increase in pay at the same rate.
 
-### Experience & Education: Another Model
+### Experience & Education: Another Representation
 
 Intuitively, education and experience are the most important variables in predicting an executive’s salary. On the plot below, experience and education (both in years) are displayed on the floor axes. On the vertical axis, the salary is displayed. The salary is also color-coded, with higher salaries being represented by more ‘hot’ colors. From the graph alone, we can see that more education and more experience is crucial to having a higher salary in an executive position.
 
 ```{r}
-p3d <- plot_ly(data = df, x = ~experience,  y = ~education, z = ~salary, opacity = 0.6, color = df$salary) %>% add_markers()
-p3D
+p <- plot_ly(data = df, x = ~experience,  y = ~education, z = ~salary, opacity = 0.6, color = df$salary) %>% add_markers()
+p
 ```
 
+### Predicting Profit
+
+One might try to predict company profits based on attributes that make a good executive. 
+
+```{r include=FALSE}
+df %>% cor()
+```
+
+However, there is little to no correlation between any variable and profit. The closest thing is would be using `assets`, but as evidenced by the plot below, there is no visible accuracy in this model.
+
+```{r include=FALSE}
+profit_model <- lm(profit ~ assets, data = df)
+summary(profit_model)
+```
+
+```{r}
+ggplot(data = df, mapping = aes(x = assets, y = profit)) + 
+    geom_point() +
+    labs(x = "Corporate Assets (Millions)", y = "Company Profits (Millions)", title = "Corporate Assets vs. Company Profits") +
+    geom_abline(intercept = 4.474, slope = 0.01843, lwd=1)
+```

@@ -1,0 +1,75 @@
+---
+title: "Exam 2"
+author: "Matthew Swanson"
+date: "10/31/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center", comment = NA)
+library(tidyverse)
+library(resampledata)
+library(nycflights13)
+library(knitr)
+library(dplyr)
+library(skimr)
+```
+
+```{r include=FALSE}
+library(resampledata)
+data("Girls2004")
+
+ans <- Girls2004 %>%
+  group_by(Smoker) %>%
+  summarize(mean = mean(Weight), N = n())
+ans
+
+md = ans[2,2] - ans[1,2]
+observed = md$mean
+observed
+
+set.seed(10001)
+
+sims <- 10^4-1 # Number of simulations (iterations)
+ans <- numeric(sims)
+for(i in 1:sims){
+  index <- sample.int(n = 69+11, size = 11, replace = FALSE) #n = total, size = num in the first group
+  ans[i] <- mean(Girls2004$Weight[index]) - mean(Girls2004$Weight[-index])
+}
+pvalue <- (sum(ans <= observed) + 1)/(sims + 1)
+pvalue
+```
+
+```{r include=FALSE}
+# Data for problem 2)
+povData <- read.table("https://hasthika.github.io/STT3850/Data/poverty.txt", header = TRUE)
+#head(povData) # Run this to make sure that you imported the data successfully.
+
+povData %>% skim()
+
+cor(x = povData$PovPct, y = povData$Brth15to17)
+
+library(ggplot2)
+ggplot(data = povData, mapping = aes(x = PovPct, y = Brth15to17)) + geom_point() + geom_smooth(method = "lm")
+
+povmodel = lm(Brth15to17 ~ PovPct, data = povData)
+povmodel
+
+ggplot(povmodel, aes(x = .fitted, y = .resid)) + geom_point()
+```
+
+```{r}
+# Data for problem 3)
+iqData <- read.table("https://hasthika.github.io/STT3850/Data/iqsize.txt", header = TRUE)
+#head(iqData) # Run this to make sure that you imported the data successfully.
+
+iqData %>% cor()
+
+multiplemodel <- lm(PIQ ~ Brain + Height + Weight, data = iqData)
+multiplemodel
+
+# Or use one of the followings to see more info...
+#library(moderndive)
+#get_regression_table(Balance_model)
+```

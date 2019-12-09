@@ -1,0 +1,129 @@
+---
+title: "Final Exam"
+author: "Matthew Swanson"
+date: "12/5/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(resampledata)
+library(dplyr)
+library(ggplot2)
+library(moderndive)
+```
+
+```{r}
+set.seed(5678)
+```
+
+1.
+
+a.
+```{r}
+data(FlightDelays)
+
+#library(knitr)
+ans <- FlightDelays %>%
+  group_by(Carrier) %>%
+  summarize(tmean = mean(Delay, trim = 0.25), N = n())
+ans
+md = ans[1,2] - ans[2,2]
+observed = md$tmean
+observed
+```
+
+b.
+```{r}
+sims <- 10^4-1 # Number of simulations (iterations)
+ans <- numeric(sims)
+for(i in 1:sims){
+  index <- sample.int(n = 2906+1123, size = 2906, replace = FALSE) #n = total, size = num in the first group
+  ans[i] <- mean(FlightDelays$Delay[index], trim = 0.25) - mean(FlightDelays$Delay[-index], trim = 0.25)
+}
+pvalue <- 2 * (sum(ans <= observed) + 1)/(sims + 1)
+pvalue
+```
+
+2.
+```{r}
+data("Spruce")
+
+model <- lm(Di.change ~ Ht.change, data = Spruce) #y ~ x
+model
+```
+
+3. 
+
+a.
+```{r}
+data("Recidivism")
+
+sims = 100000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = sample(Recidivism$Recid, size = 15)
+    Xbars[i] = mean(x == "Yes")
+}
+mean(Xbars)
+sd(Xbars)
+```
+
+b.
+```{r}
+mean(Xbars >= 0.20)
+```
+
+c.
+```{r}
+ggplot(data.frame(x = Xbars), aes(x = x)) + 
+    geom_histogram(bins = 15)
+```
+
+4.
+
+b.
+```{r}
+1 - pnorm(0.2, mean = 0.32, sd = 0.12)
+```
+
+5.
+
+a.
+```{r}
+1 - pnorm(7, mean = 10, sd = 10/sqrt(25))
+```
+
+b.
+```{r}
+sims = 100000
+Xbars = numeric(sims)
+for (i in 1:sims) {
+    x = rexp(n = 25, rate = 1/10)
+    Xbars[i] = mean(x)
+}
+mean(Xbars > 7)
+```
+
+6.
+
+b.
+```{r}
+data(TV)
+
+TV_Basic = TV %>% filter(Cable == "Basic")
+TV_Extended = TV %>% filter(Cable == "Extended")
+
+n_Basic = nrow(TV_Basic)
+n_Extended = nrow(TV_Extended)
+B = 10000
+boot_Mean_Diff = numeric(B)
+for (i in 1:B) {
+    basic <- sample(TV_Basic$Times, size = n_Basic, replace = TRUE)
+    extended <- sample(TV_Extended$Times, size = n_Extended, replace = TRUE)
+    boot_Mean_Diff[i] <- mean(basic) - mean(extended)
+}
+
+quantile(boot_Mean_Diff, probs = c(0.025,0.975))
+```
+
+
